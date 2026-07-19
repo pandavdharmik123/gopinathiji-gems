@@ -1,0 +1,190 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  admin
+  manager
+  employee
+}
+
+enum UserStatus {
+  active
+  inactive
+}
+
+enum PartyStatus {
+  active
+  inactive
+}
+
+enum TransactionType {
+  income
+  expense
+  transfer
+  adjustment
+}
+
+enum PaymentMode {
+  cash
+  bank
+  upi
+  cheque
+}
+
+enum AccountingYearStatus {
+  active
+  inactive
+}
+
+enum NotificationType {
+  warning
+  info
+  error
+  success
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  username     String     @unique
+  passwordHash String
+  role         UserRole   @default(employee)
+  email        String     @unique
+  status       UserStatus @default(active)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relations
+  auditLogs    AuditLog[]     @relation("AuditLogUser")
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model Party {
+  id            String      @id @default(cuid())
+  name          String
+  category      String
+  contactPerson String      @default("")
+  mobile        String      @default("")
+  email         String      @default("")
+  gst           String      @default("")
+  address       String      @default("")
+  notes         String      @default("")
+  status        PartyStatus @default(active)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  transactions  Transaction[]
+
+  @@map("parties")
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  voucherNo   String          @unique
+  date        DateTime
+  type        TransactionType
+  partyId     String?
+  category    String          @default("")
+  amount      Decimal         @db.Decimal(15, 2)
+  paymentMode PaymentMode     @default(cash)
+  description String          @default("")
+  createdBy   String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  party       Party?          @relation(fields: [partyId], references: [id], onDelete: SetNull)
+
+  @@index([date])
+  @@index([type])
+  @@index([partyId])
+  @@map("transactions")
+}
+
+model AccountingYear {
+  id             String               @id @default(cuid())
+  name           String               @unique
+  startDate      DateTime
+  endDate        DateTime
+  openingBalance Decimal              @db.Decimal(15, 2) @default(0)
+  notes          String               @default("")
+  status         AccountingYearStatus @default(active)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@map("accounting_years")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  userName  String
+  action    String
+  entity    String
+  details   String
+  entityId  String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  user      User?    @relation("AuditLogUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([entity])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType @default(info)
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  // Relations
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+model CompanySettings {
+  id         String   @id @default("singleton")
+  name       String   @default("Jikadara & Pandav Associates")
+  gst        String   @default("")
+  address    String   @default("")
+  phone      String   @default("")
+  email      String   @default("")
+  currency   String   @default("INR")
+  dateFormat String   @default("DD/MM/YYYY")
+  language   String   @default("gu")
+  lastBackup String   @default("")
+  updatedAt  DateTime @updatedAt
+
+  @@map("company_settings")
+}
+
+model ExpenseCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("expense_categories")
+}
