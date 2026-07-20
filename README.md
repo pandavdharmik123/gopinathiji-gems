@@ -32,7 +32,7 @@ A modern, dual-language (Gujarati & English) web-based accounting and ledger sys
 ### Prerequisites
 - Node.js (v18+)
 - PostgreSQL Database
-- pnpm
+- npm
 
 ### Running Locally
 
@@ -40,8 +40,8 @@ This project uses a monorepo-style structure where the frontend and backend are 
 
 1. **Install dependencies:**
    ```bash
-   pnpm install
-   cd server && pnpm install
+   npm install
+   cd server && npm install
    ```
 
 2. **Environment Setup:**
