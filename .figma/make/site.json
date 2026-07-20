@@ -1,0 +1,10 @@
+{
+  "description": "Streamline your business accounting with a comprehensive Gujarati ERP system that manages income, expenses, reports, and user roles efficiently.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

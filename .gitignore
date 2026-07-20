@@ -57,5 +57,3 @@ server/.env
 # Temporary scripts / misc
 remove_dm_mono.cjs
 restore_dm_mono.cjs
-
-.figma
