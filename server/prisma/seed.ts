@@ -6,7 +6,16 @@ const prisma = new PrismaClient()
 async function main() {
   console.log('Seeding admin user...')
 
-  const passwordHash = await bcrypt.hash('admin123', 12)
+  // VERY IMPORTANT: Use environment variable for production password
+  // Fallback to a default only in development if not provided
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123'
+  
+  if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD) {
+    console.warn('⚠️ WARNING: No ADMIN_PASSWORD environment variable provided in production!')
+    console.warn('⚠️ Falling back to default insecure password.')
+  }
+
+  const passwordHash = await bcrypt.hash(adminPassword, 12)
 
   await prisma.user.upsert({
     where: { username: 'admin' },
@@ -27,9 +36,6 @@ async function main() {
     },
   })
 
-  console.log('Admin user seeded')
-  console.log('Username: admin')
-  console.log('Password: admin123')
 }
 
 main()
