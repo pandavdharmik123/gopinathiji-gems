@@ -21,7 +21,7 @@ import reportRoutes from './routes/reports'
 import expenseCategoryRoutes from './routes/expenseCategories'
 
 const app = express()
-
+app.set('trust proxy', 1) // Trust Render's reverse proxy for rate limiting
 // ─── Security Middleware ──────────────────────────────────────────────────────
 app.use(helmet())
 app.use(cors({
