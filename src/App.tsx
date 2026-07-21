@@ -115,12 +115,12 @@ function AppInner() {
               icon={<MenuIcon size={20} />}
               onClick={() => setMobileMenuOpen(true)}
             />
-            <Breadcrumb items={[{ title: state.settings.name }, { title: getPageTitle(activePage) }]} />
+            <Breadcrumb className="app-breadcrumb" items={[{ title: state.settings.name }, { title: getPageTitle(activePage) }]} />
           </Space>
 
           <Space size={16}>
             <Select
-              style={{ width: 150 }}
+              className="year-select"
               placeholder={t('nav.accountingYears')}
               value={state.selectedYearId}
               onChange={v => setSelectedYearId(v)}

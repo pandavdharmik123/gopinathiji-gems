@@ -56,7 +56,7 @@ function SidebarContent({ currentUser, activePage, onNavigate, onLogout, onMobil
 
   return (
     <div className="app-sidebar-content">
-      <div className="app-brand">
+      <div className="app-brand" style={{ flexShrink: 0 }}>
         <img src="/logoTwo.png" alt="Gopinathji Gems Logo" style={{ width: 42, height: 42, objectFit: 'contain' }} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <Typography.Text strong ellipsis style={{ display: 'block', color: '#0f595c', fontSize: '1.25rem' }}>{companyName}</Typography.Text>
@@ -64,23 +64,25 @@ function SidebarContent({ currentUser, activePage, onNavigate, onLogout, onMobil
         </div>
       </div>
 
-      <Typography.Text className="app-sidebar-kicker">{t('nav.menu_title')}</Typography.Text>
-      <Menu
-        mode="inline"
-        selectedKeys={[activePage]}
-        items={visible.map(item => ({
-          key: item.page,
-          icon: item.icon,
-          label: getNavLabel(item),
-          onClick: () => {
-            onNavigate(item.page)
-            onMobileClose()
-          },
-        }))}
-        style={{ borderInlineEnd: 0, flex: 1, background: 'transparent' }}
-      />
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+        <Typography.Text className="app-sidebar-kicker">{t('nav.menu_title')}</Typography.Text>
+        <Menu
+          mode="inline"
+          selectedKeys={[activePage]}
+          items={visible.map(item => ({
+            key: item.page,
+            icon: item.icon,
+            label: getNavLabel(item),
+            onClick: () => {
+              onNavigate(item.page)
+              onMobileClose()
+            },
+          }))}
+          style={{ borderInlineEnd: 0, flex: 1, background: 'transparent' }}
+        />
+      </div>
 
-      <div className="app-sidebar-user">
+      <div className="app-sidebar-user" style={{ flexShrink: 0 }}>
         <Space>
           <Avatar style={{ background: 'var(--muted)', color: 'var(--primary)', fontWeight: 700 }}>
             {currentUser.name.charAt(0)}
@@ -110,7 +112,7 @@ export default function Sidebar(props: SidebarProps) {
         onClose={props.onMobileClose}
         width={280}
         closable={false}
-        styles={{ body: { padding: 0 } }}
+        styles={{ body: { padding: 0, overflow: 'hidden' } }}
       >
         <SidebarContent {...props} />
       </Drawer>

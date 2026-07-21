@@ -114,7 +114,7 @@ async function bootstrap() {
     console.log('✅ Database connected')
 
     app.listen(env.PORT, () => {
-      console.log(`\n🚀 Jikadara ERP Server running`)
+      console.log(`\n🚀 Gopinathji Gems Server running`)
       console.log(`   → http://localhost:${env.PORT}`)
       console.log(`   → http://localhost:${env.PORT}/health`)
       console.log(`   → Environment: ${env.NODE_ENV}\n`)

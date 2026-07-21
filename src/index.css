@@ -313,14 +313,19 @@ button, input, select, textarea,
   align-items: center;
 }
 
+.year-select {
+  width: 150px;
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .app-sidebar { display: none; }
   .main-content { margin-left: 0; }
   .mobile-menu-btn { display: inline-flex; }
-  .app-header { padding: 0 14px; }
-  .app-content { padding: 16px; }
-  .user-name, .date-pill { display: none; }
+  .app-header { padding: 0 12px; gap: 4px; }
+  .app-content { padding: 12px; }
+  .user-name, .date-pill, .app-breadcrumb { display: none; }
+  .year-select { width: 120px; }
 }
 
 /* ── Print ── */
