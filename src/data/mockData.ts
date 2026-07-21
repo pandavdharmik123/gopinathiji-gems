@@ -60,7 +60,7 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   email: 'info@jikadara.com',
   currency: 'INR',
   dateFormat: 'DD/MM/YYYY',
-  language: 'gu',
+  language: 'en',
   lastBackup: '',
   expenseCategories: 'Travel, Visa, Ticket, Hotel, Logistic, Consulting, Other',
 }

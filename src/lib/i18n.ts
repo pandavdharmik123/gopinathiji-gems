@@ -407,7 +407,7 @@ export type Language = 'en' | 'gu'
 
 export function getLanguage(): Language {
   const local = localStorage.getItem('app_language') as Language
-  return local === 'en' || local === 'gu' ? local : 'gu'
+  return local === 'en' || local === 'gu' ? local : 'en'
 }
 
 export function setLanguage(lang: Language) {
