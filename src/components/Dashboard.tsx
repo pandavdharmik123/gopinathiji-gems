@@ -4,6 +4,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { TrendingUp, TrendingDown, DollarSign, Wallet, CalendarDays, BookOpen, Plus, BarChart3, Clock, CheckCircle } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { formatCurrency } from '../data/mockData'
+import { getGujaratiTithi } from '../lib/gujaratiCalendar'
 import type { User } from '../types'
 import type { Page } from './Sidebar'
 
@@ -111,6 +112,7 @@ export default function Dashboard({ currentUser, onNavigate }: DashboardProps) {
 
   const dateLocale = state.language === 'gu' ? 'gu-IN' : 'en-IN'
   const gujaratiDate = new Date().toLocaleDateString(dateLocale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const gujaratiTithi = getGujaratiTithi(new Date())
 
   const paymentModeIcon = (mode: string) => {
     if (mode === 'cash') return '💵'
@@ -144,7 +146,15 @@ export default function Dashboard({ currentUser, onNavigate }: DashboardProps) {
       title: t('general.date'),
       dataIndex: 'date',
       key: 'date',
-      render: (v: string) => <span style={{ fontSize: '0.82rem' }}>{v}</span>,
+      render: (v: string) => {
+        const tithi = getGujaratiTithi(v)
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '0.82rem' }}>{v}</span>
+            {tithi && <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>{tithi}</span>}
+          </div>
+        )
+      },
     },
     {
       title: state.language === 'gu' ? 'પ્રકાર' : 'Type',
@@ -211,6 +221,11 @@ export default function Dashboard({ currentUser, onNavigate }: DashboardProps) {
           </Typography.Title>
           <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>
             {t('dash.welcome')}, {currentUser.name} — {gujaratiDate}
+            {gujaratiTithi && (
+              <span style={{ marginLeft: 8, color: 'var(--primary)', fontWeight: 600 }}>
+                ({gujaratiTithi})
+              </span>
+            )}
           </Typography.Text>
         </div>
         <Space size={8}>
