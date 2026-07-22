@@ -115,12 +115,14 @@ export default function Ledger() {
       title: t('general.voucher'),
       dataIndex: 'voucherNo',
       key: 'voucherNo',
+      width: 120,
       render: (v: string) => <span style={{ fontSize: '0.8rem', color: 'var(--secondary)', fontWeight: 600 }}>{v}</span>,
     },
     {
       title: t('general.date'),
       dataIndex: 'date',
       key: 'date',
+      width: 120,
       render: (v: string) => <span style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{v}</span>,
     },
     {
@@ -138,6 +140,7 @@ export default function Ledger() {
       title: t('ledger.credit'),
       dataIndex: 'credit',
       key: 'credit',
+      width: 140,
       align: 'right',
       render: (v: number) => v > 0 ? <span style={{ color: '#16a34a', fontWeight: 600 }}>{formatCurrency(v)}</span> : '—',
     },
@@ -145,6 +148,7 @@ export default function Ledger() {
       title: t('ledger.debit'),
       dataIndex: 'debit',
       key: 'debit',
+      width: 140,
       align: 'right',
       render: (v: number) => v > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{formatCurrency(v)}</span> : '—',
     },
@@ -152,6 +156,7 @@ export default function Ledger() {
       title: state.language === 'gu' ? 'બાકી રકમ (Running Balance)' : 'Running Balance',
       dataIndex: 'balance',
       key: 'balance',
+      width: 160,
       align: 'right',
       render: (v: number) => (
         <span style={{ fontWeight: 700, color: v >= 0 ? 'var(--primary)' : '#dc2626' }}>
@@ -273,7 +278,7 @@ export default function Ledger() {
                 return (
                   <Table.Summary fixed>
                     <Table.Summary.Row style={{ background: 'var(--muted)' }}>
-                      <Table.Summary.Cell index={0} colSpan={4}>
+                      <Table.Summary.Cell index={0} colSpan={3}>
                         <div style={{ fontWeight: 700, textAlign: 'right', color: 'var(--primary)' }}>{t('general.total')}</div>
                       </Table.Summary.Cell>
                       <Table.Summary.Cell index={1} align="right">
@@ -283,7 +288,7 @@ export default function Ledger() {
                         <span style={{ fontWeight: 700, color: '#dc2626' }}>{formatCurrency(totalDebit)}</span>
                       </Table.Summary.Cell>
                       <Table.Summary.Cell index={3} align="right">
-                        <span style={{ fontWeight: 700, color: netBalance >= 0 ? '#16a34a' : '#dc2626' }}>{formatCurrency(netBalance)}</span>
+                        <span style={{ fontWeight: 700, color: netBalance >= 0 ? 'var(--primary)' : '#dc2626' }}>{formatCurrency(netBalance)}</span>
                       </Table.Summary.Cell>
                     </Table.Summary.Row>
                   </Table.Summary>

@@ -17,6 +17,7 @@ import Users from './components/Users'
 import AuditLog from './components/AuditLog'
 import Settings from './components/Settings'
 import Transactions from './components/Transactions'
+import CalendarView from './components/CalendarView'
 import NotificationPanel from './components/NotificationPanel'
 
 export default function App() {
@@ -82,6 +83,7 @@ function AppInner() {
       case 'audit': return <AuditLog />
       case 'users': return <Users currentUser={currentUser} />
       case 'settings': return <Settings currentUser={currentUser} />
+      case 'calendar': return <CalendarView />
       default: return <Dashboard currentUser={currentUser} onNavigate={setActivePage} />
     }
   }

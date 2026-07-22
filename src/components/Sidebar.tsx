@@ -13,11 +13,12 @@ import {
   TrendingDown,
   TrendingUp,
   UserCheck,
+  CalendarDays,
 } from 'lucide-react'
 import type { User } from '../types'
 import { useApp } from '../store/AppContext'
 
-type Page = 'dashboard' | 'income' | 'expense' | 'transactions' | 'cashbook' | 'parties' | 'ledger' | 'reports' | 'users' | 'settings' | 'audit'
+export type Page = 'dashboard' | 'income' | 'expense' | 'transactions' | 'cashbook' | 'parties' | 'ledger' | 'reports' | 'users' | 'settings' | 'audit' | 'calendar'
 
 interface SidebarProps {
   currentUser: User
@@ -30,6 +31,7 @@ interface SidebarProps {
 
 const navItems: { page: Page; label: string; icon: React.ReactNode; roles: string[] }[] = [
   { page: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} />, roles: ['admin', 'manager', 'employee'] },
+  { page: 'calendar', label: 'Calendar', icon: <CalendarDays size={18} />, roles: ['admin', 'manager', 'employee'] },
   { page: 'income', label: 'Income', icon: <TrendingUp size={18} />, roles: ['admin', 'manager', 'employee'] },
   { page: 'expense', label: 'Expense', icon: <TrendingDown size={18} />, roles: ['admin', 'manager', 'employee'] },
   { page: 'transactions', label: 'Transactions', icon: <ReceiptText size={18} />, roles: ['admin', 'manager'] },

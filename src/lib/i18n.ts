@@ -55,6 +55,7 @@ const translations = {
     'nav.users': 'Users Management',
     'nav.settings': 'Settings',
     'nav.logout': 'Logout',
+    'nav.calendar': 'Calendar',
     'nav.menu_title': 'MAIN MENU',
 
     // Roles
@@ -256,6 +257,7 @@ const translations = {
     'nav.users': 'વપરાશકર્તા',
     'nav.settings': 'સેટિંગ',
     'nav.logout': 'લૉગઔટ',
+    'nav.calendar': 'કલેન્ડર',
     'nav.menu_title': 'મુખ્ય મેનૂ',
 
     // Roles
