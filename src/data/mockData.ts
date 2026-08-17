@@ -70,10 +70,8 @@ export const DEFAULT_SETTINGS: CompanySettings = {
 export const EXPENSE_CATEGORIES = ['પગાર', 'હોટલ', 'ટ્રાવેલ', 'વિઝા', 'માર્કેટિંગ', 'ઓફિસ ખર્ચ', 'ભાડું', 'વીજળી', 'ઇન્ટરનેટ', 'અન્ય']
 export const PARTY_CATEGORIES = ['ગ્રાહક', 'સપ્લાયર', 'હોટલ', 'વિઝા', 'ટિકિટ', 'લોજિસ્ટિક', 'બેંક', 'કર્મચારી', 'ટ્રાવેલ', 'અન્ય']
 export const PAYMENT_MODES = [
-  { value: 'cash', label: 'રોકડ' },
+  { value: 'cash', label: 'રોકડા' },
   { value: 'bank', label: 'બેંક ટ્રાન્સફર' },
-  { value: 'upi', label: 'યુ.પી.આઈ' },
-  { value: 'cheque', label: 'ચેક' },
 ]
 export const INCOME_CATEGORIES = ['ટ્રાવેલ', 'વિઝા', 'ટિકિટ', 'હોટલ', 'લોજિસ્ટિક', 'કન્સ્લ્ટિંગ', 'અન્ય']
 
@@ -89,7 +87,11 @@ export function formatDate(dateStr: string): string {
 }
 
 export function todayStr(): string {
-  return new Date().toISOString().split('T')[0]
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 export function nowStr(): string {

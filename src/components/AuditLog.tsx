@@ -13,8 +13,12 @@ export default function AuditLog() {
   const users = [...new Set(state.auditLogs.map(l => l.user))]
 
   const filtered = state.auditLogs.filter(log => {
-    const matchSearch = log.details.toLowerCase().includes(search.toLowerCase()) || 
-      log.action.toLowerCase().includes(search.toLowerCase())
+    const term = search.trim().toLowerCase()
+    const matchSearch = !term ||
+      log.details.toLowerCase().includes(term) || 
+      log.action.toLowerCase().includes(term) ||
+      log.user.toLowerCase().includes(term) ||
+      log.entity.toLowerCase().includes(term)
     const matchEntity = filterEntity ? log.entity === filterEntity : true
     const matchUser = filterUser ? log.user === filterUser : true
     return matchSearch && matchEntity && matchUser

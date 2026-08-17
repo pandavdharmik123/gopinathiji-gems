@@ -116,6 +116,7 @@ function normalizeAccountingYear(year: any): AccountingYear {
     startDate: dateOnly(year.startDate),
     endDate: dateOnly(year.endDate),
     openingBalance: Number(year.openingBalance ?? 0),
+    openingBankBalance: Number(year.openingBankBalance ?? 0),
     notes: year.notes ?? '',
     status: year.status,
   }
@@ -228,11 +229,11 @@ export const api = {
 
   accountingYears: {
     list: () => getData('/accounting-years', normalizeAccountingYear),
-    create: async (data: { name: string; startDate: string; endDate: string; openingBalance: number; notes: string; status: 'active' | 'inactive' }) => {
+    create: async (data: { name: string; startDate: string; endDate: string; openingBalance: number; openingBankBalance: number; notes: string; status: 'active' | 'inactive' }) => {
       const envelope = await request<ApiEnvelope<any>>('/accounting-years', { method: 'POST', body: JSON.stringify(data) })
       return normalizeAccountingYear(envelope.data)
     },
-    update: async (id: string, data: Partial<Pick<AccountingYear, 'name' | 'startDate' | 'endDate' | 'openingBalance' | 'notes' | 'status'>>) => {
+    update: async (id: string, data: Partial<Pick<AccountingYear, 'name' | 'startDate' | 'endDate' | 'openingBalance' | 'openingBankBalance' | 'notes' | 'status'>>) => {
       const envelope = await request<ApiEnvelope<any>>(`/accounting-years/${id}`, { method: 'PUT', body: JSON.stringify(data) })
       return normalizeAccountingYear(envelope.data)
     },

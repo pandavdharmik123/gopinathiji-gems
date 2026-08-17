@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react'
-import { Modal, Button, Tag, Table, Typography, Space, Card } from 'antd'
+import { useState, useMemo } from 'react'
+import { Modal, Button, Tag, Table, Typography, Space, Card, Row, Col } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, TrendingUp, TrendingDown } from 'lucide-react'
 import { useApp } from '../store/AppContext'
@@ -10,6 +10,7 @@ import type { Transaction } from '../types'
 export default function CalendarView() {
   const { state, t } = useApp()
   const { transactions, accountingYears, selectedYearId } = state
+  const isGu = state.language === 'gu'
 
   // Currently displayed Month & Year (defaults to today)
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
@@ -135,6 +136,40 @@ export default function CalendarView() {
     return txnsByDate.get(selectedDateStr) || { income: 0, expense: 0, list: [] }
   }, [selectedDateStr, txnsByDate])
 
+  // Opening and Closing balance calculation for selected day
+  const { dayOpeningBalance, dayClosingBalance } = useMemo(() => {
+    if (!selectedDateStr) return { dayOpeningBalance: 0, dayClosingBalance: 0 }
+
+    const baseOpening = selectedYear?.openingBalance || 0
+
+    // Sum up all transactions prior to selectedDateStr within active year
+    const priorTxns = yearTxns.filter(t => {
+      const dateKey = t.date.split('T')[0]
+      return dateKey < selectedDateStr
+    })
+
+    const priorIncome = priorTxns
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0)
+    const priorExpense = priorTxns
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0)
+
+    const openBal = baseOpening + priorIncome - priorExpense
+    const closeBal = openBal + selectedDayData.income - selectedDayData.expense
+
+    return { dayOpeningBalance: openBal, dayClosingBalance: closeBal }
+  }, [selectedDateStr, selectedYear, yearTxns, selectedDayData])
+
+  // Separate Income & Expense lists
+  const incomeList = useMemo(() => {
+    return selectedDayData.list.filter(t => t.type === 'income')
+  }, [selectedDayData.list])
+
+  const expenseList = useMemo(() => {
+    return selectedDayData.list.filter(t => t.type === 'expense')
+  }, [selectedDayData.list])
+
   const selectedGujaratiDateStr = useMemo(() => {
     if (!selectedDateStr) return ''
     return getGujaratiTithi(selectedDateStr)
@@ -145,50 +180,81 @@ export default function CalendarView() {
     return currentDate.toLocaleDateString(dateLocale, { month: 'long', year: 'numeric' })
   }, [currentDate, state.language])
 
-  // Table Columns for Modal
-  const modalColumns: ColumnsType<Transaction> = [
+  // Table Columns for Income
+  const incomeColumns: ColumnsType<Transaction> = [
     {
       title: t('general.voucher'),
       dataIndex: 'voucherNo',
       key: 'voucherNo',
+      width: 90,
       render: (v: string) => <span style={{ fontWeight: 600 }}>{v}</span>,
-    },
-    {
-      title: state.language === 'gu' ? 'પ્રકાર' : 'Type',
-      dataIndex: 'type',
-      key: 'type',
-      render: (v: string) => (
-        <Tag color={v === 'income' ? 'success' : 'error'}>
-          {v === 'income' ? t('nav.income') : t('nav.expense')}
-        </Tag>
-      ),
     },
     {
       title: t('general.party'),
       dataIndex: 'partyName',
       key: 'partyName',
-      render: (v: string) => <span>{v || '—'}</span>,
+      render: (v: string, r) => <span>{v || r.description || '—'}</span>,
     },
     {
       title: t('general.category'),
       dataIndex: 'category',
       key: 'category',
-      render: (v: string) => <span style={{ fontSize: '0.85rem' }}>{v || '—'}</span>,
+      render: (v: string) => <span style={{ fontSize: '0.82rem' }}>{v || '—'}</span>,
     },
     {
       title: t('general.payment'),
       dataIndex: 'paymentMode',
       key: 'paymentMode',
-      render: (v: string) => <span style={{ textTransform: 'uppercase', fontSize: '0.8rem' }}>{v}</span>,
+      render: (v: string) => <Tag style={{ textTransform: 'uppercase', fontSize: '0.72rem' }}>{v}</Tag>,
     },
     {
       title: t('general.amount'),
       dataIndex: 'amount',
       key: 'amount',
       align: 'right',
-      render: (v: number, record) => (
-        <span style={{ fontWeight: 700, color: record.type === 'income' ? '#16a34a' : '#dc2626' }}>
-          {record.type === 'income' ? '+' : '-'}{formatCurrency(v)}
+      render: (v: number) => (
+        <span style={{ fontWeight: 700, color: '#16a34a' }}>
+          {formatCurrency(v)}
+        </span>
+      ),
+    },
+  ]
+
+  // Table Columns for Expense
+  const expenseColumns: ColumnsType<Transaction> = [
+    {
+      title: t('general.voucher'),
+      dataIndex: 'voucherNo',
+      key: 'voucherNo',
+      width: 90,
+      render: (v: string) => <span style={{ fontWeight: 600 }}>{v}</span>,
+    },
+    {
+      title: t('general.party'),
+      dataIndex: 'partyName',
+      key: 'partyName',
+      render: (v: string, r) => <span>{v || r.description || '—'}</span>,
+    },
+    {
+      title: t('general.category'),
+      dataIndex: 'category',
+      key: 'category',
+      render: (v: string) => <span style={{ fontSize: '0.82rem' }}>{v || '—'}</span>,
+    },
+    {
+      title: t('general.payment'),
+      dataIndex: 'paymentMode',
+      key: 'paymentMode',
+      render: (v: string) => <Tag style={{ textTransform: 'uppercase', fontSize: '0.72rem' }}>{v}</Tag>,
+    },
+    {
+      title: t('general.amount'),
+      dataIndex: 'amount',
+      key: 'amount',
+      align: 'right',
+      render: (v: number) => (
+        <span style={{ fontWeight: 700, color: '#dc2626' }}>
+          {formatCurrency(v)}
         </span>
       ),
     },
@@ -392,7 +458,7 @@ export default function CalendarView() {
         </div>
       </Card>
 
-      {/* Date Transactions Modal */}
+      {/* Date Details Modal */}
       <Modal
         title={
           <div style={{ paddingRight: 24 }}>
@@ -413,48 +479,131 @@ export default function CalendarView() {
             {t('general.ok')}
           </Button>,
         ]}
-        width={750}
+        width={920}
         style={{ maxWidth: '95vw', top: 20 }}
       >
         <div style={{ marginTop: 16 }}>
-          {/* Day Totals Banner */}
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16, background: 'var(--muted)', padding: '10px 16px', borderRadius: 8 }}>
-            <div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--secondary)', display: 'block' }}>{t('nav.income')}</span>
-              <span style={{ fontWeight: 700, color: '#16a34a', fontSize: '1rem' }}>
-                +{formatCurrency(selectedDayData.income)}
-              </span>
-            </div>
-            <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 16 }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--secondary)', display: 'block' }}>{t('nav.expense')}</span>
-              <span style={{ fontWeight: 700, color: '#dc2626', fontSize: '1rem' }}>
-                -{formatCurrency(selectedDayData.expense)}
-              </span>
-            </div>
-            <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 16 }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--secondary)', display: 'block' }}>Net Profit / Loss</span>
-              <span style={{ fontWeight: 700, color: selectedDayData.income - selectedDayData.expense >= 0 ? '#16a34a' : '#dc2626', fontSize: '1rem' }}>
-                {formatCurrency(selectedDayData.income - selectedDayData.expense)}
-              </span>
-            </div>
-          </div>
+          {/* Day Balances & Totals Banner */}
+          <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+            <Col xs={12} sm={6}>
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 12px', borderRadius: 8 }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', fontWeight: 600 }}>
+                  {isGu ? 'શરૂઆત બેલેન્સ' : 'Balance Before Day Start'}
+                </span>
+                <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '1rem' }}>
+                  {formatCurrency(dayOpeningBalance)}
+                </span>
+              </div>
+            </Col>
+            <Col xs={12} sm={6}>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 12px', borderRadius: 8 }}>
+                <span style={{ fontSize: '0.75rem', color: '#166534', display: 'block', fontWeight: 600 }}>
+                  {t('nav.income')}
+                </span>
+                <span style={{ fontWeight: 700, color: '#16a34a', fontSize: '1rem' }}>
+                  +{formatCurrency(selectedDayData.income)}
+                </span>
+              </div>
+            </Col>
+            <Col xs={12} sm={6}>
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '10px 12px', borderRadius: 8 }}>
+                <span style={{ fontSize: '0.75rem', color: '#991b1b', display: 'block', fontWeight: 600 }}>
+                  {t('nav.expense')}
+                </span>
+                <span style={{ fontWeight: 700, color: '#dc2626', fontSize: '1rem' }}>
+                  -{formatCurrency(selectedDayData.expense)}
+                </span>
+              </div>
+            </Col>
+            <Col xs={12} sm={6}>
+              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px 12px', borderRadius: 8 }}>
+                <span style={{ fontSize: '0.75rem', color: '#1e40af', display: 'block', fontWeight: 600 }}>
+                  {isGu ? 'અંત બેલેન્સ' : 'Balance After Day End'}
+                </span>
+                <span style={{ fontWeight: 700, color: '#2563eb', fontSize: '1rem' }}>
+                  {formatCurrency(dayClosingBalance)}
+                </span>
+              </div>
+            </Col>
+          </Row>
 
-          {/* Transactions List Table */}
-          {selectedDayData.list.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--secondary)' }}>
-              {t('general.no_data')}
-            </div>
-          ) : (
-            <Table
-              dataSource={selectedDayData.list}
-              columns={modalColumns}
-              rowKey="id"
-              pagination={false}
-              size="small"
-            />
-          )}
+          {/* Side-by-Side Income & Expense Tables */}
+          <Row gutter={[16, 16]}>
+            {/* Left Column: Income */}
+            <Col xs={24} lg={12}>
+              <Card
+                size="small"
+                styles={{ body: { padding: 0, overflow: 'hidden' } }}
+                style={{ border: '1px solid #bbf7d0', borderRadius: 8, height: '100%', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}
+                title={
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#166534', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <TrendingUp size={16} color="#16a34a" />
+                      {isGu ? 'આવક (Income)' : 'Income'}
+                    </span>
+                    <Tag color="success" style={{ margin: 0, fontWeight: 700 }}>
+                      +{formatCurrency(selectedDayData.income)}
+                    </Tag>
+                  </div>
+                }
+              >
+                {incomeList.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '24px 0', color: '#94a3b8', fontSize: '0.88rem' }}>
+                    {isGu ? 'કોઈ આવક નથી' : 'No Income recorded'}
+                  </div>
+                ) : (
+                  <Table
+                    className="flat-table"
+                    dataSource={incomeList}
+                    columns={incomeColumns}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    scroll={{ x: true }}
+                  />
+                )}
+              </Card>
+            </Col>
+
+            {/* Right Column: Expense */}
+            <Col xs={24} lg={12}>
+              <Card
+                size="small"
+                styles={{ body: { padding: 0, overflow: 'hidden' } }}
+                style={{ border: '1px solid #fecaca', borderRadius: 8, height: '100%', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}
+                title={
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#991b1b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <TrendingDown size={16} color="#dc2626" />
+                      {isGu ? 'ખર્ચ (Expenses)' : 'Expenses'}
+                    </span>
+                    <Tag color="error" style={{ margin: 0, fontWeight: 700 }}>
+                      -{formatCurrency(selectedDayData.expense)}
+                    </Tag>
+                  </div>
+                }
+              >
+                {expenseList.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '24px 0', color: '#94a3b8', fontSize: '0.88rem' }}>
+                    {isGu ? 'કોઈ ખર્ચ નથી' : 'No Expenses recorded'}
+                  </div>
+                ) : (
+                  <Table
+                    className="flat-table"
+                    dataSource={expenseList}
+                    columns={expenseColumns}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    scroll={{ x: true }}
+                  />
+                )}
+              </Card>
+            </Col>
+          </Row>
         </div>
       </Modal>
     </div>
   )
 }
+

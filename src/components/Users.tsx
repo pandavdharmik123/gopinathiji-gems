@@ -23,11 +23,13 @@ export default function Users({ currentUser }: UsersProps) {
     { value: 'employee', label: t('role.employee') },
   ]
 
-  const filtered = state.users.filter(u =>
-    u.name.toLowerCase().includes(search.toLowerCase()) || 
-    u.username.toLowerCase().includes(search.toLowerCase()) || 
-    u.email.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = state.users.filter(u => {
+    const term = search.trim().toLowerCase()
+    return !term ||
+      u.name.toLowerCase().includes(term) || 
+      u.username.toLowerCase().includes(term) || 
+      u.email.toLowerCase().includes(term)
+  })
 
   const handleSave = async () => {
     if (!form.name || !form.username) return

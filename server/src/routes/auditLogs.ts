@@ -15,10 +15,12 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const where: any = {
       ...(entity && { entity }),
       ...(userName && { userName: { contains: userName, mode: 'insensitive' } }),
-      ...(search && {
+      ...(search?.trim() && {
         OR: [
-          { details: { contains: search, mode: 'insensitive' } },
-          { action: { contains: search, mode: 'insensitive' } },
+          { details: { contains: search.trim(), mode: 'insensitive' } },
+          { action: { contains: search.trim(), mode: 'insensitive' } },
+          { userName: { contains: search.trim(), mode: 'insensitive' } },
+          { entity: { contains: search.trim(), mode: 'insensitive' } },
         ],
       }),
     }

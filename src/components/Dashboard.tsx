@@ -1,9 +1,9 @@
 import type React from 'react'
-import { Card, Col, Row, Table, Tag, Typography, Space, Button, Alert } from 'antd'
+import { Card, Col, Row, Table, Tag, Typography, Space, Alert } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { TrendingUp, TrendingDown, DollarSign, Wallet, CalendarDays, BookOpen, Plus, BarChart3, Clock, CheckCircle } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, Wallet, CalendarDays, BookOpen, Clock, CheckCircle, Landmark, Coins } from 'lucide-react'
 import { useApp } from '../store/AppContext'
-import { formatCurrency } from '../data/mockData'
+import { formatCurrency, todayStr } from '../data/mockData'
 import { getGujaratiTithi } from '../lib/gujaratiCalendar'
 import type { User } from '../types'
 import type { Page } from './Sidebar'
@@ -28,11 +28,11 @@ function StatCard({ label, value, sub, color, bgColor, iconBg, icon, trend }: St
   return (
     <Card 
       bordered={false}
-      styles={{ body: { padding: '22px 20px' } }}
+      styles={{ body: { padding: '20px 18px' } }}
       style={{ 
         height: '100%', 
         background: bgColor, 
-        border: `1.5px solid ${color}15`, 
+        border: `1.5px solid ${color}18`, 
         borderRadius: 14,
         boxShadow: 'none'
       }}
@@ -42,11 +42,11 @@ function StatCard({ label, value, sub, color, bgColor, iconBg, icon, trend }: St
           <Typography.Text style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: 6, color: color }}>
             {label}
           </Typography.Text>
-          <Typography.Title level={3} style={{ margin: 0, fontWeight: 800, letterSpacing: '-0.02em', color: '#1e293b', fontSize: '1.5rem' }}>
+          <Typography.Title level={3} style={{ margin: 0, fontWeight: 800, letterSpacing: '-0.02em', color: '#1e293b', fontSize: '1.45rem' }}>
             {value}
           </Typography.Title>
           {sub && (
-            <Typography.Text style={{ fontSize: '0.78rem', display: 'block', marginTop: 4, color: `${color}bb` }}>
+            <Typography.Text style={{ fontSize: '0.76rem', display: 'block', marginTop: 4, color: `${color}cc`, fontWeight: 500 }}>
               {sub}
             </Typography.Text>
           )}
@@ -59,8 +59,8 @@ function StatCard({ label, value, sub, color, bgColor, iconBg, icon, trend }: St
           )}
         </div>
         <div style={{
-          width: 42,
-          height: 42,
+          width: 40,
+          height: 40,
           borderRadius: '50%',
           background: iconBg,
           color: color,
@@ -77,11 +77,11 @@ function StatCard({ label, value, sub, color, bgColor, iconBg, icon, trend }: St
   )
 }
 
-export default function Dashboard({ currentUser, onNavigate }: DashboardProps) {
+export default function Dashboard({ currentUser }: DashboardProps) {
   const { state, t } = useApp()
   const { transactions, accountingYears, selectedYearId } = state
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayStr()
 
   // Find currently selected Accounting Year
   const selectedYear = accountingYears.find(y => y.id === selectedYearId)
@@ -92,17 +92,24 @@ export default function Dashboard({ currentUser, onNavigate }: DashboardProps) {
     return t.date >= selectedYear.startDate && t.date <= selectedYear.endDate
   })
 
-  // Calculations scoped to the year
+  // Overall calculations scoped to the year
   const yearIncome = yearTxns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
   const yearExpense = yearTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
   const yearProfit = yearIncome - yearExpense
-  const openingBalance = selectedYear ? selectedYear.openingBalance : 0
-  const currentBalance = openingBalance + yearIncome - yearExpense
 
-  // Today's summary (only if today is within active year)
-  const todayTxns = yearTxns.filter(t => t.date === today)
-  const todayIncome = todayTxns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const todayExpense = todayTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+  // Cash calculations (રોકડા)
+  const cashIncome = yearTxns.filter(t => t.type === 'income' && t.paymentMode === 'cash').reduce((s, t) => s + t.amount, 0)
+  const cashExpense = yearTxns.filter(t => t.type === 'expense' && t.paymentMode === 'cash').reduce((s, t) => s + t.amount, 0)
+  const cashProfit = cashIncome - cashExpense
+  const openingCashBalance = selectedYear ? Number(selectedYear.openingBalance || 0) : 0
+  const cashBalance = openingCashBalance + cashIncome - cashExpense
+
+  // Bank calculations (બેંક)
+  const bankIncome = yearTxns.filter(t => t.type === 'income' && t.paymentMode === 'bank').reduce((s, t) => s + t.amount, 0)
+  const bankExpense = yearTxns.filter(t => t.type === 'expense' && t.paymentMode === 'bank').reduce((s, t) => s + t.amount, 0)
+  const bankProfit = bankIncome - bankExpense
+  const openingBankBalance = selectedYear ? Number(selectedYear.openingBankBalance || 0) : 0
+  const bankBalance = openingBankBalance + bankIncome - bankExpense
 
   // Recent transactions scoped to the active year
   const recentTxns = [...yearTxns].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5)
@@ -190,22 +197,33 @@ export default function Dashboard({ currentUser, onNavigate }: DashboardProps) {
   // Monthly summary values
   const currentYearMonths = () => {
     if (!selectedYear) return []
-    const start = new Date(selectedYear.startDate)
-    const end = new Date(selectedYear.endDate)
+    const [sYear, sMonth] = selectedYear.startDate.split('-').map(Number)
+    const [eYear, eMonth] = selectedYear.endDate.split('-').map(Number)
     const monthList: { label: string; yearMonth: string }[] = []
     
-    let current = new Date(start.getFullYear(), start.getMonth(), 1)
-    while (current <= end) {
-      const yearMonth = current.toISOString().slice(0, 7)
-      const label = current.toLocaleDateString(dateLocale, { month: 'long', year: 'numeric' })
+    let y = sYear
+    let m = sMonth
+    while (y < eYear || (y === eYear && m <= eMonth)) {
+      const yearMonth = `${y}-${String(m).padStart(2, '0')}`
+      const dateObj = new Date(y, m - 1, 1)
+      const label = dateObj.toLocaleDateString(dateLocale, { month: 'long', year: 'numeric' })
       monthList.push({ label, yearMonth })
-      current.setMonth(current.getMonth() + 1)
+      m++
+      if (m > 12) {
+        m = 1
+        y++
+      }
     }
     return monthList
   }
 
   const activeMonths = currentYearMonths()
-  const latestMonth = activeMonths[activeMonths.length - 1] || { label: state.language === 'gu' ? 'હાલનો મહિનો' : 'Current Month', yearMonth: today.slice(0, 7) }
+  const currentMonthYM = today.slice(0, 7)
+  const currentMonthObj = activeMonths.find(m => m.yearMonth === currentMonthYM)
+  const latestMonth = currentMonthObj || activeMonths[activeMonths.length - 1] || { 
+    label: new Date().toLocaleDateString(dateLocale, { month: 'long', year: 'numeric' }), 
+    yearMonth: currentMonthYM 
+  }
   const monthTxnsOnly = yearTxns.filter(t => t.date.startsWith(latestMonth.yearMonth))
   const monthIncome = monthTxnsOnly.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
   const monthExpense = monthTxnsOnly.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
@@ -213,7 +231,7 @@ export default function Dashboard({ currentUser, onNavigate }: DashboardProps) {
 
   return (
     <div>
-      {/* Header with Quick Actions */}
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
         <div>
           <Typography.Title level={3} style={{ margin: 0, fontWeight: 700, color: 'var(--foreground)' }}>
@@ -228,17 +246,6 @@ export default function Dashboard({ currentUser, onNavigate }: DashboardProps) {
             )}
           </Typography.Text>
         </div>
-        <Space size={8}>
-          {/*<Button type="primary" icon={<Plus size={14} />} onClick={() => onNavigate('income')}>*/}
-          {/*  {t('dash.add_income')}*/}
-          {/*</Button>*/}
-          {/*<Button type="primary" danger icon={<Plus size={14} />} onClick={() => onNavigate('expense')}>*/}
-          {/*  {t('dash.add_expense')}*/}
-          {/*</Button>*/}
-          {/*<Button icon={<BarChart3 size={14} />} onClick={() => onNavigate('reports')}>*/}
-          {/*  {t('dash.view_reports')}*/}
-          {/*</Button>*/}
-        </Space>
       </div>
 
       {/* Alerts */}
@@ -254,33 +261,35 @@ export default function Dashboard({ currentUser, onNavigate }: DashboardProps) {
         </Row>
       )}
 
-      {/* Stats Section */}
+      {/* Stats Section - 3 Overview Cards */}
       <div style={{ marginBottom: 24 }}>
         <Typography.Text strong style={{ fontSize: '0.75rem', color: 'var(--secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 12 }}>
           {selectedYear ? `${selectedYear.name} ${state.language === 'gu' ? 'નું સરવૈયું' : 'Overview'}` : (state.language === 'gu' ? 'સરવૈયું' : 'Overview')}
         </Typography.Text>
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} lg={8}>
             <StatCard 
               label={t('dash.total_income')} 
               value={formatCurrency(yearIncome)} 
+              sub={`${t('dash.cash_income')}: ${formatCurrency(cashIncome)} | ${t('dash.bank_income')}: ${formatCurrency(bankIncome)}`}
               color="#15803d" 
               bgColor="#f0fdf4"
               iconBg="#ffffff"
               icon={<TrendingUp size={20} />} 
             />
           </Col>
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} lg={8}>
             <StatCard 
               label={t('dash.total_expense')} 
               value={formatCurrency(yearExpense)} 
+              sub={`${t('dash.cash_expense')}: ${formatCurrency(cashExpense)} | ${t('dash.bank_expense')}: ${formatCurrency(bankExpense)}`}
               color="#ea580c" 
               bgColor="#fff7ed"
               iconBg="#ffffff"
               icon={<TrendingDown size={20} />} 
             />
           </Col>
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} lg={8}>
             <StatCard 
               label={t('dash.net_profit')} 
               value={formatCurrency(yearProfit)} 
@@ -290,19 +299,97 @@ export default function Dashboard({ currentUser, onNavigate }: DashboardProps) {
               icon={<DollarSign size={20} />} 
             />
           </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <StatCard
-              label={t('dash.cash_balance')}
-              value={formatCurrency(currentBalance)}
-              sub={selectedYear ? `${t('dash.opening_balance')}: ${formatCurrency(openingBalance)}` : (state.language === 'gu' ? 'કોઈ ડેટા નથી' : 'No data')}
-              color="#4f46e5"
-              bgColor="#eef2ff"
-              iconBg="#ffffff"
-              icon={<Wallet size={20} />}
-            />
-          </Col>
         </Row>
       </div>
+
+      {/* Cash Account vs Bank Account Breakdown Cards */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        {/* Cash Account */}
+        <Col xs={24} lg={12}>
+          <Card
+            bordered={false}
+            title={
+              <Space>
+                <Coins size={18} color="#2563eb" />
+                <span style={{ fontWeight: 700, color: '#1e3a8a' }}>{t('dash.cash_overview')}</span>
+              </Space>
+            }
+            extra={<Tag color="blue" style={{ fontWeight: 600 }}>{t('dash.cash_balance')}: {formatCurrency(cashBalance)}</Tag>}
+            style={{ height: '100%', borderRadius: 14, border: '1.5px solid #2563eb20', boxShadow: 'none' }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('year.opening_cash_balance')}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 600, color: 'var(--foreground)' }}>{formatCurrency(openingCashBalance)}</Typography.Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.cash_income')}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: '#16a34a' }}>+{formatCurrency(cashIncome)}</Typography.Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.cash_expense')}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: '#dc2626' }}>-{formatCurrency(cashExpense)}</Typography.Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.cash_profit')}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: cashProfit >= 0 ? '#16a34a' : '#dc2626' }}>{formatCurrency(cashProfit)}</Typography.Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#eff6ff', borderRadius: 10, marginTop: 4, border: '1px solid #bfdbfe' }}>
+                <div>
+                  <Typography.Text strong style={{ fontSize: '0.9rem', color: '#1e40af', display: 'block' }}>{t('dash.cash_balance')}</Typography.Text>
+                  <Typography.Text style={{ fontSize: '0.72rem', color: '#3b82f6' }}>
+                    {formatCurrency(openingCashBalance)} + {formatCurrency(cashIncome)} - {formatCurrency(cashExpense)}
+                  </Typography.Text>
+                </div>
+                <Typography.Text strong style={{ fontSize: '1.2rem', color: '#1e40af', fontWeight: 800 }}>{formatCurrency(cashBalance)}</Typography.Text>
+              </div>
+            </div>
+          </Card>
+        </Col>
+
+        {/* Bank Account */}
+        <Col xs={24} lg={12}>
+          <Card
+            bordered={false}
+            title={
+              <Space>
+                <Landmark size={18} color="#0891b2" />
+                <span style={{ fontWeight: 700, color: '#155e75' }}>{t('dash.bank_overview')}</span>
+              </Space>
+            }
+            extra={<Tag color="cyan" style={{ fontWeight: 600 }}>{t('dash.bank_balance')}: {formatCurrency(bankBalance)}</Tag>}
+            style={{ height: '100%', borderRadius: 14, border: '1.5px solid #0891b220', boxShadow: 'none' }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('year.opening_bank_balance')}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 600, color: 'var(--foreground)' }}>{formatCurrency(openingBankBalance)}</Typography.Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.bank_income')}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: '#16a34a' }}>+{formatCurrency(bankIncome)}</Typography.Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.bank_expense')}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: '#dc2626' }}>-{formatCurrency(bankExpense)}</Typography.Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.bank_profit')}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: bankProfit >= 0 ? '#16a34a' : '#dc2626' }}>{formatCurrency(bankProfit)}</Typography.Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#ecfeff', borderRadius: 10, marginTop: 4, border: '1px solid #a5f3fc' }}>
+                <div>
+                  <Typography.Text strong style={{ fontSize: '0.9rem', color: '#0e7490', display: 'block' }}>{t('dash.bank_balance')}</Typography.Text>
+                  <Typography.Text style={{ fontSize: '0.72rem', color: '#06b6d4' }}>
+                    {formatCurrency(openingBankBalance)} + {formatCurrency(bankIncome)} - {formatCurrency(bankExpense)}
+                  </Typography.Text>
+                </div>
+                <Typography.Text strong style={{ fontSize: '1.2rem', color: '#0e7490', fontWeight: 800 }}>{formatCurrency(bankBalance)}</Typography.Text>
+              </div>
+            </div>
+          </Card>
+        </Col>
+      </Row>
 
       {/* Monthly + Accounting Year Details Row */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
@@ -347,7 +434,8 @@ export default function Dashboard({ currentUser, onNavigate }: DashboardProps) {
                   { label: t('dash.year_name'), value: selectedYear.name },
                   { label: t('dash.start_date'), value: selectedYear.startDate },
                   { label: t('dash.end_date'), value: selectedYear.endDate },
-                  { label: t('dash.opening_balance'), value: formatCurrency(selectedYear.openingBalance) },
+                  { label: t('year.opening_cash_balance'), value: formatCurrency(selectedYear.openingBalance) },
+                  { label: t('year.opening_bank_balance'), value: formatCurrency(selectedYear.openingBankBalance || 0) },
                 ].map(item => (
                   <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                     <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{item.label}</Typography.Text>
@@ -380,6 +468,8 @@ export default function Dashboard({ currentUser, onNavigate }: DashboardProps) {
           </Space>
         }
         extra={<Tag color="blue">{t('dash.recent_limit')}</Tag>}
+        styles={{ body: { padding: 0 } }}
+        style={{ borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}
       >
         <Table<typeof transactions[number]>
           columns={columns}

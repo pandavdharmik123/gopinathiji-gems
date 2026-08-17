@@ -55,12 +55,12 @@ router.get('/', validateQuery(querySchema), async (req: Request, res: Response, 
           ...(dateTo && { lte: new Date(dateTo + 'T23:59:59') }),
         },
       } : {}),
-      ...(search && {
+      ...(search?.trim() && {
         OR: [
-          { voucherNo: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } },
-          { category: { contains: search, mode: 'insensitive' } },
-          { party: { name: { contains: search, mode: 'insensitive' } } },
+          { voucherNo: { contains: search.trim(), mode: 'insensitive' } },
+          { description: { contains: search.trim(), mode: 'insensitive' } },
+          { category: { contains: search.trim(), mode: 'insensitive' } },
+          { party: { name: { contains: search.trim(), mode: 'insensitive' } } },
         ],
       }),
     }

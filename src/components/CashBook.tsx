@@ -10,7 +10,7 @@ import TransliteratedInput from './TransliteratedInput'
 
 interface CashBookProps { currentUser: User }
 
-const emptyForm = { name: '', startDate: '', endDate: '', openingBalance: '', notes: '', status: 'inactive' as 'active' | 'inactive' }
+const emptyForm = { name: '', startDate: '', endDate: '', openingBalance: '', openingBankBalance: '', notes: '', status: 'inactive' as 'active' | 'inactive' }
 
 export default function CashBook({ currentUser }: CashBookProps) {
   const { state, createAccountingYear, updateAccountingYear, deleteAccountingYear, setSelectedYearId, t } = useApp()
@@ -30,6 +30,7 @@ export default function CashBook({ currentUser }: CashBookProps) {
         startDate: form.startDate,
         endDate: form.endDate,
         openingBalance: Number(form.openingBalance) || 0,
+        openingBankBalance: Number(form.openingBankBalance) || 0,
         notes: form.notes,
         status: form.status,
       }
@@ -53,7 +54,8 @@ export default function CashBook({ currentUser }: CashBookProps) {
       name: y.name,
       startDate: y.startDate,
       endDate: y.endDate,
-      openingBalance: String(y.openingBalance),
+      openingBalance: String(y.openingBalance ?? 0),
+      openingBankBalance: String(y.openingBankBalance ?? 0),
       notes: y.notes,
       status: y.status
     })
@@ -105,11 +107,18 @@ export default function CashBook({ currentUser }: CashBookProps) {
       render: (v: string) => <span style={{  }}>{v}</span>,
     },
     {
-      title: t('dash.opening_balance'),
+      title: t('year.opening_cash_balance'),
       dataIndex: 'openingBalance',
       key: 'openingBalance',
       align: 'right',
       render: (v: number) => <span style={{  }}>{formatCurrency(v)}</span>,
+    },
+    {
+      title: t('year.opening_bank_balance'),
+      dataIndex: 'openingBankBalance',
+      key: 'openingBankBalance',
+      align: 'right',
+      render: (v: number) => <span style={{ color: '#2563eb', fontWeight: 600 }}>{formatCurrency(v || 0)}</span>,
     },
     {
       title: t('general.notes'),
@@ -213,8 +222,12 @@ export default function CashBook({ currentUser }: CashBookProps) {
                   <Typography.Text style={{ color: 'white', fontWeight: 600 }}>{selectedYear.endDate}</Typography.Text>
                 </Col>
                 <Col>
-                  <Typography.Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.72rem', display: 'block' }}>{t('dash.opening_balance')}</Typography.Text>
+                  <Typography.Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.72rem', display: 'block' }}>{t('year.opening_cash_balance')}</Typography.Text>
                   <Typography.Text style={{ color: '#86efac', fontWeight: 700 }}>{formatCurrency(selectedYear.openingBalance)}</Typography.Text>
+                </Col>
+                <Col>
+                  <Typography.Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.72rem', display: 'block' }}>{t('year.opening_bank_balance')}</Typography.Text>
+                  <Typography.Text style={{ color: '#93c5fd', fontWeight: 700 }}>{formatCurrency(selectedYear.openingBankBalance || 0)}</Typography.Text>
                 </Col>
               </Row>
             </Col>
@@ -270,21 +283,25 @@ export default function CashBook({ currentUser }: CashBookProps) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>{t('dash.opening_balance')} (₹)</label>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>{t('year.opening_cash_balance')} (₹)</label>
               <Input type="number" placeholder="0" value={form.openingBalance} onChange={e => setForm(f => ({ ...f, openingBalance: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>{t('general.status')}</label>
-              <Select
-                style={{ width: '100%' }}
-                value={form.status}
-                onChange={v => setForm(f => ({ ...f, status: v }))}
-                options={[
-                  { value: 'active', label: t('general.active') },
-                  { value: 'inactive', label: t('general.inactive') }
-                ]}
-              />
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>{t('year.opening_bank_balance')} (₹)</label>
+              <Input type="number" placeholder="0" value={form.openingBankBalance} onChange={e => setForm(f => ({ ...f, openingBankBalance: e.target.value }))} />
             </div>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>{t('general.status')}</label>
+            <Select
+              style={{ width: '100%' }}
+              value={form.status}
+              onChange={v => setForm(f => ({ ...f, status: v }))}
+              options={[
+                { value: 'active', label: t('general.active') },
+                { value: 'inactive', label: t('general.inactive') }
+              ]}
+            />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>{t('general.notes')}</label>

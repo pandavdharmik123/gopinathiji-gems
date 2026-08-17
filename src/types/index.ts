@@ -47,6 +47,7 @@ export interface AccountingYear {
   startDate: string
   endDate: string
   openingBalance: number
+  openingBankBalance: number
   notes: string
   status: 'active' | 'inactive'
 }

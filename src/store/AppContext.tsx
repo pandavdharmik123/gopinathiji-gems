@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react'
-import type { AppState, AppAction, AuditLog, Notification, Party, Transaction, User, AccountingYear } from '../types'
+import type { AppState, AppAction, AuditLog, Notification, Party, Transaction, User, AccountingYear, CompanySettings } from '../types'
 import { DEFAULT_SETTINGS, uid, nowStr } from '../data/mockData'
 import { ApiError, api } from '../lib/api'
 import { getLanguage, setLanguage, translate, type Language } from '../lib/i18n'
@@ -100,6 +100,8 @@ interface AppContextValue {
   state: AppState
   dispatch: React.Dispatch<AppAction>
   loading: boolean
+  dataLoaded: boolean
+  resetDataLoaded: () => void
   error: string
   refreshData: () => Promise<void>
   t: (key: string) => string
@@ -114,8 +116,8 @@ interface AppContextValue {
   createTransaction: (data: Omit<Transaction, 'id' | 'voucherNo' | 'partyName' | 'createdBy' | 'createdAt' | 'updatedAt'>) => Promise<Transaction>
   updateTransaction: (id: string, data: Partial<Omit<Transaction, 'id' | 'voucherNo' | 'partyName' | 'createdBy' | 'createdAt' | 'updatedAt'>>) => Promise<Transaction>
   deleteTransaction: (id: string) => Promise<void>
-  createAccountingYear: (data: { name: string; startDate: string; endDate: string; openingBalance: number; notes: string; status: 'active' | 'inactive' }) => Promise<void>
-  updateAccountingYear: (id: string, data: Partial<Pick<AccountingYear, 'name' | 'startDate' | 'endDate' | 'openingBalance' | 'notes' | 'status'>>) => Promise<void>
+  createAccountingYear: (data: { name: string; startDate: string; endDate: string; openingBalance: number; openingBankBalance: number; notes: string; status: 'active' | 'inactive' }) => Promise<void>
+  updateAccountingYear: (id: string, data: Partial<Pick<AccountingYear, 'name' | 'startDate' | 'endDate' | 'openingBalance' | 'openingBankBalance' | 'notes' | 'status'>>) => Promise<void>
   deleteAccountingYear: (id: string) => Promise<void>
   setSelectedYearId: (id: string | null) => void
   updateSettings: (settings: Partial<CompanySettings>) => Promise<void>
@@ -133,6 +135,7 @@ const AppContext = createContext<AppContextValue | null>(null)
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, undefined, getInitialState)
   const [loading, setLoading] = useReducer((_state: boolean, next: boolean) => next, false)
+  const [dataLoaded, setDataLoaded] = useReducer((_state: boolean, next: boolean) => next, false)
   const [error, setError] = useReducer((_state: string, next: string) => next, '')
 
   const changeLanguage = (lang: Language) => {
@@ -144,16 +147,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return translate(key, state.language)
   }
 
+  const resetDataLoaded = () => {
+    setDataLoaded(false)
+  }
+
   const refreshData = async () => {
     setLoading(true)
     setError('')
     try {
-      const [parties, transactions, accountingYears, settings, notifications, rawCategories] = await Promise.all([
+      const [parties, transactions, accountingYears, settings, rawCategories] = await Promise.all([
         api.parties.list(),
         api.transactions.list(),
         api.accountingYears.list(),
         api.settings.get(),
-        api.notifications.list(),
         api.expenseCategories.list(),
       ])
 
@@ -183,11 +189,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           selectedYearId: state.selectedYearId || (accountingYears.find(y => y.status === 'active')?.id || accountingYears[0]?.id || null),
           language: state.language || getLanguage(),
           auditLogs: auditLogsResult.status === 'fulfilled' ? auditLogsResult.value : [],
-          notifications,
+          notifications: [],
           settings,
           expenseCategories,
         },
       })
+      setDataLoaded(true)
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Backend data load failed'
       setError(message)
@@ -253,53 +260,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const createTransaction = async (data: Omit<Transaction, 'id' | 'voucherNo' | 'partyName' | 'createdBy' | 'createdAt' | 'updatedAt'>) => {
-    const transaction = await api.transactions.create(data)
-    dispatch({ type: 'ADD_TRANSACTION', payload: transaction })
-    await refreshData()
-    return transaction
+    const txn = await api.transactions.create(data)
+    dispatch({ type: 'ADD_TRANSACTION', payload: txn })
+    return txn
   }
 
   const updateTransaction = async (id: string, data: Partial<Omit<Transaction, 'id' | 'voucherNo' | 'partyName' | 'createdBy' | 'createdAt' | 'updatedAt'>>) => {
-    const transaction = await api.transactions.update(id, data)
-    dispatch({ type: 'UPDATE_TRANSACTION', payload: transaction })
-    await refreshData()
-    return transaction
+    const txn = await api.transactions.update(id, data)
+    dispatch({ type: 'UPDATE_TRANSACTION', payload: txn })
+    return txn
   }
 
   const deleteTransaction = async (id: string) => {
     await api.transactions.delete(id)
     dispatch({ type: 'DELETE_TRANSACTION', payload: id })
-    await refreshData()
   }
 
-  const createAccountingYear = async (data: { name: string; startDate: string; endDate: string; openingBalance: number; notes: string; status: 'active' | 'inactive' }) => {
-    const year = await api.accountingYears.create(data)
-    dispatch({ type: 'ADD_ACCOUNTING_YEAR', payload: year })
-    await refreshData()
+  const createAccountingYear = async (data: { name: string; startDate: string; endDate: string; openingBalance: number; openingBankBalance: number; notes: string; status: 'active' | 'inactive' }) => {
+    const yr = await api.accountingYears.create(data)
+    dispatch({ type: 'ADD_ACCOUNTING_YEAR', payload: yr })
+    if (yr.status === 'active') {
+      dispatch({ type: 'SET_SELECTED_YEAR', payload: yr.id })
+    }
   }
 
-  const updateAccountingYear = async (id: string, data: Partial<Pick<AccountingYear, 'name' | 'startDate' | 'endDate' | 'openingBalance' | 'notes' | 'status'>>) => {
-    const year = await api.accountingYears.update(id, data)
-    dispatch({ type: 'UPDATE_ACCOUNTING_YEAR', payload: year })
-    await refreshData()
+  const updateAccountingYear = async (id: string, data: Partial<Pick<AccountingYear, 'name' | 'startDate' | 'endDate' | 'openingBalance' | 'openingBankBalance' | 'notes' | 'status'>>) => {
+    const yr = await api.accountingYears.update(id, data)
+    dispatch({ type: 'UPDATE_ACCOUNTING_YEAR', payload: yr })
   }
 
   const deleteAccountingYear = async (id: string) => {
     await api.accountingYears.delete(id)
     dispatch({ type: 'DELETE_ACCOUNTING_YEAR', payload: id })
-    if (state.selectedYearId === id) {
-      dispatch({ type: 'SET_SELECTED_YEAR', payload: null })
-    }
-    await refreshData()
   }
 
   const setSelectedYearId = (id: string | null) => {
     dispatch({ type: 'SET_SELECTED_YEAR', payload: id })
   }
 
-  const updateSettings = async (settings: Partial<CompanySettings>) => {
-    const updated = await api.settings.update(settings)
-    dispatch({ type: 'UPDATE_SETTINGS', payload: updated })
+  const updateSettings = async (settingsData: Partial<CompanySettings>) => {
+    const settings = await api.settings.update(settingsData)
+    dispatch({ type: 'UPDATE_SETTINGS', payload: settings })
   }
 
   const markNotificationRead = async (id: string) => {
@@ -313,40 +314,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const exportBackup = () => {
-    const backup = JSON.stringify(state, null, 2)
-    const blob = new Blob([backup], { type: 'application/json' })
+    const data = JSON.stringify(state, null, 2)
+    const blob = new Blob([data], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `jikadara-backup-${new Date().toISOString().split('T')[0]}.json`
+    a.download = `erp-backup-${new Date().toISOString().split('T')[0]}.json`
     a.click()
     URL.revokeObjectURL(url)
-    dispatch({ type: 'UPDATE_SETTINGS', payload: { lastBackup: nowStr() } })
-    void updateSettings({ lastBackup: nowStr() })
-    addNotification('success', 'બેકઅપ સફળ', 'ડેટા JSON ફાઇલ તરીકે ડાઉનલોડ થઈ ગઈ')
   }
 
-  const importBackup = (file: File): Promise<void> => {
-    return new Promise((resolve, reject) => {
+  const importBackup = async (file: File) => {
+    return new Promise<void>((resolve, reject) => {
       const reader = new FileReader()
-      reader.onload = (e) => {
+      reader.onload = e => {
         try {
-          const data = JSON.parse(e.target?.result as string) as AppState
-          dispatch({ type: 'SET_STATE', payload: data })
-          addNotification('success', 'પુનઃસ્થાપિત સફળ', 'ડેટા પુનઃ ઉઘડ્યો')
+          const parsed = JSON.parse(e.target?.result as string) as AppState
+          dispatch({ type: 'SET_STATE', payload: parsed })
           resolve()
         } catch {
           reject(new Error('Invalid backup file'))
         }
       }
-      reader.onerror = reject
       reader.readAsText(file)
     })
   }
 
   const createExpenseCategory = async (name: string) => {
-    const category = await api.expenseCategories.create(name)
-    dispatch({ type: 'ADD_EXPENSE_CATEGORY', payload: category })
+    const cat = await api.expenseCategories.create(name)
+    dispatch({ type: 'ADD_EXPENSE_CATEGORY', payload: cat })
   }
 
   const deleteExpenseCategory = async (id: string) => {
@@ -359,6 +355,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       state,
       dispatch,
       loading,
+      dataLoaded,
+      resetDataLoaded,
       error,
       refreshData,
       t,

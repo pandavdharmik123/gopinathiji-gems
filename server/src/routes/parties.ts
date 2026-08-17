@@ -28,11 +28,14 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const { search, category, status } = req.query as Record<string, string>
     const parties = await prisma.party.findMany({
       where: {
-        ...(search && {
+        ...(search?.trim() && {
           OR: [
-            { name: { contains: search, mode: 'insensitive' } },
-            { contactPerson: { contains: search, mode: 'insensitive' } },
-            { mobile: { contains: search } },
+            { name: { contains: search.trim(), mode: 'insensitive' } },
+            { contactPerson: { contains: search.trim(), mode: 'insensitive' } },
+            { mobile: { contains: search.trim() } },
+            { email: { contains: search.trim(), mode: 'insensitive' } },
+            { address: { contains: search.trim(), mode: 'insensitive' } },
+            { gst: { contains: search.trim(), mode: 'insensitive' } },
           ],
         }),
         ...(category && { category }),

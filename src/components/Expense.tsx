@@ -36,8 +36,12 @@ export default function Expense({ currentUser }: ExpenseProps) {
   const [saving, setSaving] = useState(false)
 
   const filtered = expenseList.filter(t => {
-    const matchSearch = t.voucherNo.toLowerCase().includes(search.toLowerCase()) ||
-      t.partyName.includes(search) || t.description.includes(search)
+    const term = search.trim().toLowerCase()
+    const matchSearch = !term ||
+      t.voucherNo.toLowerCase().includes(term) ||
+      t.partyName.toLowerCase().includes(term) ||
+      t.description.toLowerCase().includes(term) ||
+      t.category.toLowerCase().includes(term)
     const matchCat = filterCategory ? t.category === filterCategory : true
     const matchDate = filterDate ? t.date === filterDate : true
     return matchSearch && matchCat && matchDate
@@ -136,7 +140,7 @@ export default function Expense({ currentUser }: ExpenseProps) {
       title: t('general.payment'),
       dataIndex: 'paymentMode',
       key: 'paymentMode',
-      render: (v: string) => <span style={{ fontSize: '0.8rem' }}>{PAYMENT_MODES.find(m => m.value === v)?.label}</span>,
+      render: (v: string) => <span style={{ fontSize: '0.8rem' }}>{PAYMENT_MODES.find(m => m.value === v)?.label || (v === 'upi' ? 'યુ.પી.આઈ' : v === 'cheque' ? 'ચેક' : v)}</span>,
     },
     {
       title: t('general.description'),
@@ -242,7 +246,7 @@ export default function Expense({ currentUser }: ExpenseProps) {
           size="middle"
           pagination={{ pageSize: 15, showSizeChanger: false, showTotal: (total) => `${t('general.total')} ${total} ${t('general.records')}` }}
           locale={{ emptyText: t('general.no_data') }}
-          scroll={{ x: 'max-content' }}
+          scroll={{ x: 'max-content', y: 'calc(100vh - 280px)' }}
         />
       </div>
 

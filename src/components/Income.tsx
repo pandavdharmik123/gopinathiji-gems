@@ -14,11 +14,11 @@ const emptyForm = { date: todayStr(), partyId: '', category: '', amount: '', pay
 
 export default function Income({ currentUser }: IncomeProps) {
   const { state, createTransaction, updateTransaction, deleteTransaction, t } = useApp()
-  
+
   const categoriesList = state.expenseCategories.map(c => c.name)
 
   const selectedYear = state.accountingYears.find(y => y.id === state.selectedYearId)
-  
+
   // Filter income list to selected year
   const incomeList = state.transactions
     .filter(t => t.type === 'income')
@@ -36,8 +36,12 @@ export default function Income({ currentUser }: IncomeProps) {
   const [saving, setSaving] = useState(false)
 
   const filtered = incomeList.filter(t => {
-    const matchSearch = t.voucherNo.toLowerCase().includes(search.toLowerCase()) ||
-      t.partyName.includes(search) || t.description.includes(search)
+    const term = search.trim().toLowerCase()
+    const matchSearch = !term ||
+      t.voucherNo.toLowerCase().includes(term) ||
+      t.partyName.toLowerCase().includes(term) ||
+      t.description.toLowerCase().includes(term) ||
+      t.category.toLowerCase().includes(term)
     const matchCat = filterCategory ? t.category === filterCategory : true
     const matchDate = filterDate ? t.date === filterDate : true
     return matchSearch && matchCat && matchDate
@@ -45,7 +49,7 @@ export default function Income({ currentUser }: IncomeProps) {
 
   const handleSave = async () => {
     if (!form.partyId || !form.amount || !form.date) return
-    
+
     // Validate date falls within selected accounting year
     if (selectedYear) {
       if (form.date < selectedYear.startDate || form.date > selectedYear.endDate) {
@@ -131,7 +135,7 @@ export default function Income({ currentUser }: IncomeProps) {
       title: t('general.payment'),
       dataIndex: 'paymentMode',
       key: 'paymentMode',
-      render: (v: string) => <span style={{ fontSize: '0.8rem' }}>{PAYMENT_MODES.find(m => m.value === v)?.label}</span>,
+      render: (v: string) => <span style={{ fontSize: '0.8rem' }}>{PAYMENT_MODES.find(m => m.value === v)?.label || (v === 'upi' ? 'યુ.પી.આઈ' : v === 'cheque' ? 'ચેક' : v)}</span>,
     },
     {
       title: t('general.description'),
@@ -232,8 +236,8 @@ export default function Income({ currentUser }: IncomeProps) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6, color: 'var(--foreground)' }}>{t('general.date')} *</label>
-              <DatePicker 
-                value={form.date ? dayjs(form.date) : null} 
+              <DatePicker
+                value={form.date ? dayjs(form.date) : null}
                 onChange={(date) => setForm(f => ({ ...f, date: date ? date.format('YYYY-MM-DD') : '' }))}
                 disabledDate={(current) => {
                   if (!selectedYear) return false

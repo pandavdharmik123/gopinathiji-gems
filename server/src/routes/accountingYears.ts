@@ -15,6 +15,7 @@ const createYearSchema = z.object({
   startDate: z.string().min(1),
   endDate: z.string().min(1),
   openingBalance: z.number().default(0),
+  openingBankBalance: z.number().default(0),
   notes: z.string().default(''),
   status: z.enum(['active', 'inactive']).default('active'),
 })
@@ -34,7 +35,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 // ─── POST /api/accounting-years ──────────────────────────────────────────────
 router.post('/', requireManager, validateBody(createYearSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, startDate, endDate, openingBalance, notes, status } = req.body as z.infer<typeof createYearSchema>
+    const { name, startDate, endDate, openingBalance, openingBankBalance, notes, status } = req.body as z.infer<typeof createYearSchema>
     
     const start = new Date(startDate)
     const end = new Date(endDate)
@@ -57,6 +58,7 @@ router.post('/', requireManager, validateBody(createYearSchema), async (req: Req
         startDate: start,
         endDate: end,
         openingBalance,
+        openingBankBalance,
         notes,
         status,
       },
@@ -78,7 +80,7 @@ router.post('/', requireManager, validateBody(createYearSchema), async (req: Req
 // ─── PUT /api/accounting-years/:id ───────────────────────────────────────────
 router.put('/:id', requireManager, validateBody(updateYearSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, startDate, endDate, openingBalance, notes, status } = req.body as z.infer<typeof updateYearSchema>
+    const { name, startDate, endDate, openingBalance, openingBankBalance, notes, status } = req.body as z.infer<typeof updateYearSchema>
     const id = req.params.id
 
     const existingYear = await prisma.accountingYear.findUnique({ where: { id } })
@@ -108,6 +110,7 @@ router.put('/:id', requireManager, validateBody(updateYearSchema), async (req: R
         startDate: startDate ? start : undefined,
         endDate: endDate ? end : undefined,
         openingBalance,
+        openingBankBalance,
         notes,
         status,
       },

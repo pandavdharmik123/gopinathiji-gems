@@ -38,8 +38,12 @@ export default function Transactions({ currentUser }: TransactionsProps) {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 
   const filtered = all.filter(t => {
-    const matchSearch = t.voucherNo.toLowerCase().includes(search.toLowerCase()) ||
-      t.partyName.includes(search) || t.description.includes(search) || t.category.includes(search)
+    const term = search.trim().toLowerCase()
+    const matchSearch = !term ||
+      t.voucherNo.toLowerCase().includes(term) ||
+      t.partyName.toLowerCase().includes(term) ||
+      t.description.toLowerCase().includes(term) ||
+      t.category.toLowerCase().includes(term)
     const matchType = filterType ? t.type === filterType : true
     const matchMode = filterMode ? t.paymentMode === filterMode : true
     const matchFrom = filterDateFrom ? t.date >= filterDateFrom : true
@@ -181,7 +185,7 @@ export default function Transactions({ currentUser }: TransactionsProps) {
       title: t('general.payment'),
       dataIndex: 'paymentMode',
       key: 'paymentMode',
-      render: (v: string) => <span style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>{PAYMENT_MODES.find(m => m.value === v)?.label}</span>,
+      render: (v: string) => <span style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>{PAYMENT_MODES.find(m => m.value === v)?.label || (v === 'upi' ? 'યુ.પી.આઈ' : v === 'cheque' ? 'ચેક' : v)}</span>,
     },
     {
       title: t('general.description'),
@@ -246,8 +250,6 @@ export default function Transactions({ currentUser }: TransactionsProps) {
           options={[
             { value: 'income', label: t('nav.income') },
             { value: 'expense', label: t('nav.expense') },
-            { value: 'transfer', label: state.language === 'gu' ? 'ટ્રાન્સફર' : 'Transfer' },
-            { value: 'adjustment', label: state.language === 'gu' ? 'ગોઠવણ' : 'Adjustment' },
           ]}
         />
         <Select
@@ -297,7 +299,7 @@ export default function Transactions({ currentUser }: TransactionsProps) {
           size="middle"
           pagination={{ pageSize: 15, showSizeChanger: false, showTotal: (total) => `${t('general.total')} ${total} ${t('general.records')}` }}
           locale={{ emptyText: t('general.no_data') }}
-          scroll={{ x: 'max-content' }}
+          scroll={{ x: 'max-content', y: 'calc(100vh - 280px)' }}
         />
       </div>
 
@@ -337,8 +339,6 @@ export default function Transactions({ currentUser }: TransactionsProps) {
                 options={[
                   { value: 'income', label: t('nav.income') },
                   { value: 'expense', label: t('nav.expense') },
-                  { value: 'transfer', label: state.language === 'gu' ? 'ટ્રાન્સફર' : 'Transfer' },
-                  { value: 'adjustment', label: state.language === 'gu' ? 'ગોઠવણ' : 'Adjustment' },
                 ]}
               />
             </div>

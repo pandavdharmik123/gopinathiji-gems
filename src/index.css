@@ -236,7 +236,7 @@ textarea,
 .app-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: 16px;
   max-width: 1480px;
   width: 100%;
   margin: 0 auto;
@@ -311,6 +311,18 @@ textarea,
 .ant-table-wrapper {
   border-radius: 8px;
   overflow: hidden;
+}
+
+.flat-table,
+.flat-table .ant-table-wrapper,
+.flat-table .ant-table,
+.flat-table .ant-table-container,
+.flat-table .ant-table-content,
+.flat-table table,
+.flat-table .ant-table-thead>tr>th,
+.flat-table .ant-table-thead>tr:first-child>th:first-child,
+.flat-table .ant-table-thead>tr:first-child>th:last-child {
+  border-radius: 0 !important;
 }
 
 .ant-menu-item {
@@ -490,4 +502,15 @@ ul[data-testid="rt-suggestions-list"] li[style*="background-color: #65c3d7"],
 ul[data-testid="rt-suggestions-list"] li[style*="background-color: rgb(101, 195, 215)"] {
   background-color: var(--primary) !important;
   color: #ffffff !important;
+}
+
+/* ── Seamless Table in Antd Card Overrides (Zero outer padding) ── */
+.ant-card:has(.ant-table-wrapper)>.ant-card-body,
+.ant-card:has(.ant-table)>.ant-card-body {
+  padding: 0 !important;
+}
+
+.ant-card:has(.ant-table-wrapper) .ant-table-pagination,
+.ant-card:has(.ant-table) .ant-table-pagination {
+  margin: 16px 20px !important;
 }

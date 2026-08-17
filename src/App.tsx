@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Alert, Avatar, Badge, Breadcrumb, Button, Layout, Space, Spin, Typography, Select } from 'antd'
-import { Bell, Menu as MenuIcon, Languages } from 'lucide-react'
+import { Alert, Avatar, Breadcrumb, Button, Layout, Space, Typography, Select } from 'antd'
+import { Menu as MenuIcon, Languages } from 'lucide-react'
 import { AppProvider, useApp } from './store/AppContext'
 import type { User } from './types'
 import { api, clearToken, getToken } from './lib/api'
@@ -18,7 +18,43 @@ import AuditLog from './components/AuditLog'
 import Settings from './components/Settings'
 import Transactions from './components/Transactions'
 import CalendarView from './components/CalendarView'
-import NotificationPanel from './components/NotificationPanel'
+import LoadingScreen from './components/LoadingScreen'
+
+const PAGE_TO_ROUTE: Record<Page, string> = {
+  dashboard: '/dashboard',
+  calendar: '/calendar',
+  income: '/income',
+  expense: '/expense',
+  transactions: '/transactions',
+  cashbook: '/cashbook',
+  parties: '/parties',
+  ledger: '/ledger',
+  reports: '/reports',
+  users: '/users',
+  settings: '/settings',
+  audit: '/audit',
+}
+
+const ROUTE_TO_PAGE: Record<string, Page> = {
+  '/': 'dashboard',
+  '/dashboard': 'dashboard',
+  '/calendar': 'calendar',
+  '/income': 'income',
+  '/expense': 'expense',
+  '/transactions': 'transactions',
+  '/cashbook': 'cashbook',
+  '/parties': 'parties',
+  '/ledger': 'ledger',
+  '/reports': 'reports',
+  '/users': 'users',
+  '/settings': 'settings',
+  '/audit': 'audit',
+}
+
+function getPageFromPath(pathname: string): Page {
+  const cleanPath = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname
+  return ROUTE_TO_PAGE[cleanPath] || 'dashboard'
+}
 
 export default function App() {
   return (
@@ -29,13 +65,40 @@ export default function App() {
 }
 
 function AppInner() {
-  const { state, refreshData, loading, error, setSelectedYearId, changeLanguage, t } = useApp()
+  const { state, refreshData, loading, dataLoaded, resetDataLoaded, error, setSelectedYearId, changeLanguage, t } = useApp()
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
-  const [activePage, setActivePage] = useState<Page>('dashboard')
+  const [activePage, setActivePageInternal] = useState<Page>(() => getPageFromPath(window.location.pathname))
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [notifOpen, setNotifOpen] = useState(false)
 
+  const handleNavigate = (page: Page, replace = false) => {
+    setActivePageInternal(page)
+    const targetPath = PAGE_TO_ROUTE[page] || '/dashboard'
+    if (window.location.pathname !== targetPath) {
+      if (replace) {
+        window.history.replaceState({}, '', targetPath)
+      } else {
+        window.history.pushState({}, '', targetPath)
+      }
+    }
+  }
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const page = getPageFromPath(window.location.pathname)
+      setActivePageInternal(page)
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  useEffect(() => {
+    if (window.location.pathname === '/') {
+      window.history.replaceState({}, '', '/dashboard')
+    }
+  }, [])
+
+  // Restore session
   useEffect(() => {
     let mounted = true
     async function restoreSession() {
@@ -45,7 +108,6 @@ function AppInner() {
       }
       try {
         const user = await api.me()
-        await refreshData()
         if (mounted) setCurrentUser(user)
       } catch {
         clearToken()
@@ -57,22 +119,32 @@ function AppInner() {
     return () => { mounted = false }
   }, [])
 
+  // Fetch initial data once user is authenticated
+  useEffect(() => {
+    if (currentUser && !dataLoaded && !loading) {
+      void refreshData()
+    }
+  }, [currentUser, dataLoaded, loading, refreshData])
+
   if (authLoading) {
-    return (
-      <div className="center-screen">
-        <Spin />
-        <Typography.Text strong style={{ marginTop: 12 }}>{t('general.loading')}</Typography.Text>
-      </div>
-    )
+    return <LoadingScreen fullScreen />
   }
 
   if (!currentUser) {
-    return <Login onLogin={async user => { await refreshData(); setCurrentUser(user); setActivePage('dashboard') }} />
+    return (
+      <Login
+        onLogin={user => {
+          setCurrentUser(user)
+          const currentPage = getPageFromPath(window.location.pathname)
+          handleNavigate(currentPage, true)
+        }}
+      />
+    )
   }
 
   const renderPage = () => {
     switch (activePage) {
-      case 'dashboard': return <Dashboard currentUser={currentUser} onNavigate={setActivePage} />
+      case 'dashboard': return <Dashboard currentUser={currentUser} onNavigate={handleNavigate} />
       case 'income': return <Income currentUser={currentUser} />
       case 'expense': return <Expense currentUser={currentUser} />
       case 'transactions': return <Transactions currentUser={currentUser} />
@@ -84,7 +156,7 @@ function AppInner() {
       case 'users': return <Users currentUser={currentUser} />
       case 'settings': return <Settings currentUser={currentUser} />
       case 'calendar': return <CalendarView />
-      default: return <Dashboard currentUser={currentUser} onNavigate={setActivePage} />
+      default: return <Dashboard currentUser={currentUser} onNavigate={handleNavigate} />
     }
   }
 
@@ -102,8 +174,8 @@ function AppInner() {
       <Sidebar
         currentUser={currentUser}
         activePage={activePage}
-        onNavigate={setActivePage}
-        onLogout={() => { clearToken(); setCurrentUser(null) }}
+        onNavigate={handleNavigate}
+        onLogout={() => { clearToken(); setCurrentUser(null); resetDataLoaded() }}
         mobileOpen={mobileMenuOpen}
         onMobileClose={() => setMobileMenuOpen(false)}
       />
@@ -141,13 +213,6 @@ function AppInner() {
               {state.language === 'en' ? 'GU' : 'EN'}
             </Button>
 
-            <Badge dot offset={[-2, 4]}>
-              <Button
-                type="text"
-                icon={<Bell size={19} />}
-                onClick={() => setNotifOpen(true)}
-              />
-            </Badge>
             <Typography.Text type="secondary" className="date-pill">{dateDisplay}</Typography.Text>
             <Space size={8}>
               <Avatar style={{ background: 'var(--muted)', color: 'var(--primary)', fontWeight: 700 }}>
@@ -159,10 +224,16 @@ function AppInner() {
         </Layout.Header>
 
         <Layout.Content className="app-content">
-          {(loading || error) && (
-            <Alert type={error ? 'error' : 'info'} showIcon message={error || t('general.saving')} style={{ marginBottom: 16 }} />
+          {(loading && !dataLoaded) ? (
+            <LoadingScreen />
+          ) : (
+            <>
+              {(loading || error) && (
+                <Alert type={error ? 'error' : 'info'} showIcon message={error || t('general.saving')} style={{ marginBottom: 16 }} />
+              )}
+              {renderPage()}
+            </>
           )}
-          {renderPage()}
         </Layout.Content>
 
         {/*<Layout.Footer className="app-footer">*/}
@@ -170,10 +241,6 @@ function AppInner() {
         {/*  <span>v1.0.0 — {state.language === 'gu' ? 'ગુજરાતી ERP લાઇટ' : 'Multi-language ERP'}</span>*/}
         {/*</Layout.Footer>*/}
       </Layout>
-
-      {/* Notification Panel */}
-      <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
-
     </Layout>
   )
 }
