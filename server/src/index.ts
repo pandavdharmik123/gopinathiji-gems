@@ -19,6 +19,7 @@ import notificationRoutes from './routes/notifications'
 import settingsRoutes from './routes/settings'
 import reportRoutes from './routes/reports'
 import expenseCategoryRoutes from './routes/expenseCategories'
+import backupRoutes from './routes/backup'
 
 const app = express()
 app.set('trust proxy', 1) // Trust Render's reverse proxy for rate limiting
@@ -71,6 +72,7 @@ app.use('/api/notifications', notificationRoutes)
 app.use('/api/settings', settingsRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/expense-categories', expenseCategoryRoutes)
+app.use('/api/backup', backupRoutes)
 
 // ─── Transliteration Proxy ───────────────────────────────────────────────────
 app.get('/api/transliterate/:lang/:text', async (req, res, next) => {

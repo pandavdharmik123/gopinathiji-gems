@@ -125,6 +125,9 @@ interface AppContextValue {
   clearNotifications: () => Promise<void>
   exportBackup: () => void
   importBackup: (file: File) => Promise<void>
+  exportExcelBackup: (password?: string) => Promise<void>
+  previewExcelBackup: (file: File, password?: string) => Promise<any>
+  importExcelBackup: (file: File, password?: string) => Promise<void>
   createExpenseCategory: (name: string) => Promise<void>
   deleteExpenseCategory: (id: string) => Promise<void>
 }
@@ -340,6 +343,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
   }
 
+  const exportExcelBackup = async (password?: string) => {
+    await api.backup.exportExcel(password)
+  }
+
+  const previewExcelBackup = async (file: File, password?: string) => {
+    return api.backup.previewExcel(file, password)
+  }
+
+  const importExcelBackup = async (file: File, password?: string) => {
+    await api.backup.importExcel(file, password)
+    await refreshData()
+  }
+
   const createExpenseCategory = async (name: string) => {
     const cat = await api.expenseCategories.create(name)
     dispatch({ type: 'ADD_EXPENSE_CATEGORY', payload: cat })
@@ -379,6 +395,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       clearNotifications,
       exportBackup,
       importBackup,
+      exportExcelBackup,
+      previewExcelBackup,
+      importExcelBackup,
       createExpenseCategory,
       deleteExpenseCategory,
     }}>

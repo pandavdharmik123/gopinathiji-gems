@@ -268,4 +268,81 @@ export const api = {
     },
     delete: (id: string) => request<ApiEnvelope<never>>(`/expense-categories/${id}`, { method: 'DELETE' }),
   },
+  backup: {
+    exportExcel: async (password?: string) => {
+      const token = getToken()
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const response = await fetch(`${API_URL}/backup/export-excel`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ password: password || undefined })
+      })
+
+      if (!response.ok) {
+        let errorMsg = 'Failed to export Excel file'
+        try {
+          const errJson = await response.json()
+          if (errJson?.message) errorMsg = errJson.message
+        } catch {}
+        throw new ApiError(errorMsg, response.status)
+      }
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const dateStr = new Date().toISOString().split('T')[0]
+      a.download = `gopinathji-gems-backup-${dateStr}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    },
+    previewExcel: async (file: File, password?: string) => {
+      const token = getToken()
+      const formData = new FormData()
+      formData.append('file', file)
+      if (password) formData.append('password', password)
+
+      const headers: Record<string, string> = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const response = await fetch(`${API_URL}/backup/preview-excel`, {
+        method: 'POST',
+        headers,
+        body: formData
+      })
+
+      const json = await response.json()
+      if (!response.ok || !json.success) {
+        throw new ApiError(json.message || 'Failed to preview Excel file', response.status)
+      }
+      return json.data
+    },
+    importExcel: async (file: File, password?: string) => {
+      const token = getToken()
+      const formData = new FormData()
+      formData.append('file', file)
+      if (password) formData.append('password', password)
+
+      const headers: Record<string, string> = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const response = await fetch(`${API_URL}/backup/import-excel`, {
+        method: 'POST',
+        headers,
+        body: formData
+      })
+
+      const json = await response.json()
+      if (!response.ok || !json.success) {
+        throw new ApiError(json.message || 'Failed to restore from Excel file', response.status)
+      }
+      return json.data
+    }
+  }
 }

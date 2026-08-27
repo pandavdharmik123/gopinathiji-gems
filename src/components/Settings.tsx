@@ -10,7 +10,9 @@ import {
   Alert,
   Space,
   Tag,
-  Popconfirm
+  Popconfirm,
+  Modal,
+  message
 } from 'antd'
 import {
   Save,
@@ -27,8 +29,14 @@ import {
   Mail,
   FileText,
   DollarSign,
-  CheckCircle2,
-  Search
+  Search,
+  FileSpreadsheet,
+  Lock,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import type { User } from '../types'
@@ -42,8 +50,9 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
   const {
     state,
     updateSettings,
-    exportBackup,
-    importBackup,
+    exportExcelBackup,
+    previewExcelBackup,
+    importExcelBackup,
     changeLanguage,
     createExpenseCategory,
     deleteExpenseCategory,
@@ -52,8 +61,22 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
 
   const [form, setForm] = useState({ ...state.settings })
   const [saved, setSaved] = useState(false)
-  const [restoring, setRestoring] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // Excel Export Modal State
+  const [exportModalVisible, setExportModalVisible] = useState(false)
+  const [exportPassword, setExportPassword] = useState('')
+  const [showExportPassword, setShowExportPassword] = useState(false)
+  const [exportingExcel, setExportingExcel] = useState(false)
+
+  // Excel Import Modal State
+  const [importModalVisible, setImportModalVisible] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importPassword, setImportPassword] = useState('')
+  const [showImportPassword, setShowImportPassword] = useState(false)
+  const [previewData, setPreviewData] = useState<any>(null)
+  const [previewing, setPreviewing] = useState(false)
+  const [restoringExcel, setRestoringExcel] = useState(false)
 
   // Expense Categories State
   const [newCat, setNewCat] = useState('')
@@ -79,17 +102,57 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
     }
   }
 
-  const handleRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setRestoring(true)
+  const handleExportExcel = async () => {
+    setExportingExcel(true)
     try {
-      await importBackup(file)
-    } catch {
-      alert(isGu ? 'ફાઇલ વાંચી ન શકાઈ' : 'Could not read backup file')
+      await exportExcelBackup(exportPassword)
+      message.success(isGu ? 'Excel ફાઇલ ડાઉનલોડ થઈ ગઈ!' : 'Excel backup downloaded successfully!')
+      setExportModalVisible(false)
+      setExportPassword('')
+    } catch (err: any) {
+      message.error(err?.message || (isGu ? 'Excel નિકાસ નિષ્ફળ ગઈ' : 'Failed to export Excel file'))
+    } finally {
+      setExportingExcel(false)
     }
-    setRestoring(false)
-    e.target.value = ''
+  }
+
+  const handleFileSelectForImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setImportFile(file)
+      setPreviewData(null)
+    }
+  }
+
+  const handlePreviewExcel = async () => {
+    if (!importFile) return
+    setPreviewing(true)
+    try {
+      const summary = await previewExcelBackup(importFile, importPassword)
+      setPreviewData(summary)
+      message.info(isGu ? 'Excel ફાઇલ ચકાસવામાં આવી!' : 'Excel file verified!')
+    } catch (err: any) {
+      message.error(err?.message || (isGu ? 'ફાઇલ ચકાસી શકાઈ નથી' : 'Failed to verify Excel file'))
+    } finally {
+      setPreviewing(false)
+    }
+  }
+
+  const handleConfirmImportExcel = async () => {
+    if (!importFile) return
+    setRestoringExcel(true)
+    try {
+      await importExcelBackup(importFile, importPassword)
+      message.success(t('settings.import_success'))
+      setImportModalVisible(false)
+      setImportFile(null)
+      setImportPassword('')
+      setPreviewData(null)
+    } catch (err: any) {
+      message.error(err?.message || (isGu ? 'ડેટા પુનઃસ્થાપિત નિષ્ફળ' : 'Failed to restore database from Excel'))
+    } finally {
+      setRestoringExcel(false)
+    }
   }
 
   const handleAddCategory = async () => {
@@ -384,15 +447,20 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
             <Card
               bordered={false}
               title={
-                <Space>
-                  <HardDrive size={18} color="var(--primary)" />
-                  <span style={{ fontWeight: 700 }}>{t('settings.backup_restore')}</span>
-                </Space>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  <Space>
+                    <HardDrive size={18} color="var(--primary)" />
+                    <span style={{ fontWeight: 700 }}>{t('settings.backup_restore')}</span>
+                  </Space>
+                  <Tag color="green" style={{ borderRadius: 8, fontWeight: 600 }}>
+                    Excel (.xlsx) Protected
+                  </Tag>
+                </div>
               }
               style={{ borderRadius: 16, border: '1px solid var(--border)', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}
               styles={{ body: { padding: '22px 24px' } }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* Last Backup Pill */}
                 <div
                   style={{
@@ -414,60 +482,80 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
                     </Typography.Text>
                   </div>
                   <Tag color="cyan" style={{ borderRadius: 8, fontWeight: 600, margin: 0 }}>
-                    JSON Format
+                    {isGu ? 'સુરક્ષિત બેકઅપ' : 'Secure Backup'}
                   </Tag>
                 </div>
 
-                {/* Download Backup Button */}
-                <Button
-                  type="primary"
-                  icon={<Download size={15} />}
-                  onClick={exportBackup}
+                {/* ─── Excel Section ─── */}
+                <div
                   style={{
+                    background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
+                    border: '1.5px solid #bbf7d0',
+                    borderRadius: 12,
+                    padding: '16px',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: 8,
-                    fontWeight: 600,
-                    height: 38,
-                    background: 'linear-gradient(135deg, #102a83 0%, #00a8ff 100%)'
+                    flexDirection: 'column',
+                    gap: 12
                   }}
                 >
-                  {t('settings.download_backup')}
-                </Button>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ background: '#16a34a', color: '#fff', padding: 6, borderRadius: 8, display: 'flex' }}>
+                        <FileSpreadsheet size={18} />
+                      </div>
+                      <div>
+                        <Typography.Text strong style={{ fontSize: '0.92rem', color: '#15803d' }}>
+                          {t('settings.excel_backup_title')}
+                        </Typography.Text>
+                        <span style={{ fontSize: '0.74rem', color: '#16a34a', display: 'block' }}>
+                          {isGu ? 'માઇક્રોસોફ્ટ એક્સેલ પાસવર્ડ સપોર્ટ સાથે' : 'Office OpenXML standard encryption (.xlsx)'}
+                        </span>
+                      </div>
+                    </div>
+                    <Tag color="success" style={{ fontWeight: 600, borderRadius: 6 }}>
+                      Standard
+                    </Tag>
+                  </div>
 
-                {/* Restore Section */}
-                <div style={{ borderTop: '1px dashed var(--border)', paddingTop: 14, marginTop: 4 }}>
-                  <Typography.Text strong style={{ fontSize: '0.85rem', display: 'block', marginBottom: 8 }}>
-                    {t('settings.restore_data')}
-                  </Typography.Text>
-                  <Alert
-                    type="warning"
-                    showIcon
-                    message={t('settings.restore_warning')}
-                    style={{ marginBottom: 12, padding: '8px 12px', fontSize: '0.78rem', borderRadius: 8 }}
-                  />
-                  <label
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 8,
-                      padding: '10px 20px',
-                      borderRadius: 8,
-                      background: '#ffffff',
-                      border: '1.5px dashed var(--primary)',
-                      cursor: 'pointer',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
-                      color: 'var(--primary)',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <Upload size={16} />
-                    <span>{restoring ? (isGu ? 'પુનઃસ્થાપિત થાય છે...' : 'Restoring...') : t('settings.select_file')}</span>
-                    <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleRestore} />
-                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <Button
+                      type="primary"
+                      icon={<Lock size={15} />}
+                      onClick={() => setExportModalVisible(true)}
+                      style={{
+                        height: 40,
+                        borderRadius: 8,
+                        fontWeight: 600,
+                        background: '#16a34a',
+                        borderColor: '#16a34a',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6
+                      }}
+                    >
+                      {t('settings.export_excel')}
+                    </Button>
+
+                    <Button
+                      icon={<Upload size={15} />}
+                      onClick={() => setImportModalVisible(true)}
+                      style={{
+                        height: 40,
+                        borderRadius: 8,
+                        fontWeight: 600,
+                        color: '#15803d',
+                        borderColor: '#86efac',
+                        background: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6
+                      }}
+                    >
+                      {t('settings.import_excel')}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -599,6 +687,275 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
           )}
         </div>
       </Card>
+
+      {/* ─── Export Excel Modal ────────────────────────────────────────────── */}
+      <Modal
+        open={exportModalVisible}
+        onCancel={() => {
+          if (!exportingExcel) {
+            setExportModalVisible(false)
+            setExportPassword('')
+          }
+        }}
+        footer={null}
+        title={
+          <Space>
+            <div style={{ background: '#dcfce7', color: '#16a34a', padding: 6, borderRadius: 8 }}>
+              <Lock size={18} />
+            </div>
+            <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>{t('settings.export_modal_title')}</span>
+          </Space>
+        }
+        style={{ top: 80 }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 10 }}>
+          <Alert
+            type="info"
+            showIcon
+            icon={<ShieldCheck size={16} color="#16a34a" />}
+            message={
+              <span style={{ fontSize: '0.82rem' }}>
+                {isGu
+                  ? 'તમામ પાર્ટીઓ, વ્યવહારો, નાણાકીય વર્ષો, ખર્ચ શ્રેણીઓ અને સેટિંગ્સ સંપૂર્ણ સુરક્ષા સાથે એક્સેલ ફાઇલમાં સાચવવામાં આવશે.'
+                  : 'All parties, transactions, financial years, categories, and settings will be exported with standard Office encryption.'}
+              </span>
+            }
+            style={{ borderRadius: 10 }}
+          />
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: 6, color: 'var(--foreground)' }}>
+              {t('settings.export_password_label')}
+            </label>
+            <Input
+              type={showExportPassword ? 'text' : 'password'}
+              placeholder={t('settings.export_password_placeholder')}
+              value={exportPassword}
+              onChange={e => setExportPassword(e.target.value)}
+              prefix={<Lock size={15} color="var(--muted-foreground)" />}
+              suffix={
+                <Button
+                  type="text"
+                  size="small"
+                  icon={showExportPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  onClick={() => setShowExportPassword(prev => !prev)}
+                />
+              }
+              style={{ borderRadius: 8, height: 40 }}
+            />
+            <Typography.Text type="secondary" style={{ fontSize: '0.76rem', marginTop: 6, display: 'block' }}>
+              💡 {t('settings.export_password_hint')}
+            </Typography.Text>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
+            <Button
+              onClick={() => {
+                setExportModalVisible(false)
+                setExportPassword('')
+              }}
+              disabled={exportingExcel}
+              style={{ borderRadius: 8 }}
+            >
+              {t('general.cancel')}
+            </Button>
+            <Button
+              type="primary"
+              icon={<Download size={15} />}
+              loading={exportingExcel}
+              onClick={handleExportExcel}
+              style={{
+                borderRadius: 8,
+                fontWeight: 600,
+                background: '#16a34a',
+                borderColor: '#16a34a'
+              }}
+            >
+              {exportingExcel ? t('settings.exporting') : t('settings.export_btn')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ─── Import Excel Modal ────────────────────────────────────────────── */}
+      <Modal
+        open={importModalVisible}
+        onCancel={() => {
+          if (!restoringExcel) {
+            setImportModalVisible(false)
+            setImportFile(null)
+            setImportPassword('')
+            setPreviewData(null)
+          }
+        }}
+        footer={null}
+        title={
+          <Space>
+            <div style={{ background: '#eff6ff', color: '#2563eb', padding: 6, borderRadius: 8 }}>
+              <FileSpreadsheet size={18} />
+            </div>
+            <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>{t('settings.import_modal_title')}</span>
+          </Space>
+        }
+        width={560}
+        style={{ top: 70 }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 10 }}>
+          {/* File Picker */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: 6, color: 'var(--foreground)' }}>
+              {t('settings.import_file_label')} *
+            </label>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 8,
+                padding: '20px',
+                borderRadius: 10,
+                background: importFile ? '#f0fdf4' : '#f8fafc',
+                border: importFile ? '1.5px solid #86efac' : '1.5px dashed var(--border)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <FileSpreadsheet size={28} color={importFile ? '#16a34a' : 'var(--muted-foreground)'} />
+              <span style={{ fontSize: '0.88rem', fontWeight: 600, color: importFile ? '#15803d' : 'var(--foreground)' }}>
+                {importFile ? importFile.name : (isGu ? 'અહીં ક્લિક કરી .xlsx બેકઅપ ફાઇલ પસંદ કરો' : 'Click to select .xlsx backup file')}
+              </span>
+              {importFile && (
+                <span style={{ fontSize: '0.75rem', color: '#16a34a' }}>
+                  ({(importFile.size / 1024).toFixed(1)} KB)
+                </span>
+              )}
+              <input type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleFileSelectForImport} />
+            </label>
+          </div>
+
+          {/* Password Input */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: 6, color: 'var(--foreground)' }}>
+              {t('settings.import_password_label')}
+            </label>
+            <Input
+              type={showImportPassword ? 'text' : 'password'}
+              placeholder={t('settings.import_password_placeholder')}
+              value={importPassword}
+              onChange={e => setImportPassword(e.target.value)}
+              prefix={<Lock size={15} color="var(--muted-foreground)" />}
+              suffix={
+                <Button
+                  type="text"
+                  size="small"
+                  icon={showImportPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  onClick={() => setShowImportPassword(prev => !prev)}
+                />
+              }
+              style={{ borderRadius: 8, height: 40 }}
+            />
+          </div>
+
+          {/* Verify / Preview Button */}
+          {importFile && !previewData && (
+            <Button
+              type="default"
+              icon={<Search size={15} />}
+              loading={previewing}
+              onClick={handlePreviewExcel}
+              style={{ borderRadius: 8, fontWeight: 600, height: 38 }}
+            >
+              {isGu ? 'ફાઇલ ચકાસો / પૂર્વાવલોકન કરો' : 'Inspect & Verify Backup'}
+            </Button>
+          )}
+
+          {/* Preview Details Card */}
+          {previewData && (
+            <div
+              style={{
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: 12,
+                padding: '14px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography.Text strong style={{ fontSize: '0.85rem', color: 'var(--foreground)' }}>
+                  📋 {t('settings.import_preview_title')}
+                </Typography.Text>
+                <Tag color="blue" style={{ fontWeight: 600, borderRadius: 6, margin: 0 }}>
+                  {previewData.companyName || 'ERP Data'}
+                </Tag>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                <div style={{ background: '#ffffff', padding: '8px 10px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', display: 'block' }}>{isGu ? 'પાર્ટીઓ' : 'Parties'}</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--foreground)' }}>{previewData.counts?.parties || 0}</span>
+                </div>
+                <div style={{ background: '#ffffff', padding: '8px 10px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', display: 'block' }}>{isGu ? 'વ્યવહારો' : 'Transactions'}</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 800, color: '#16a34a' }}>{previewData.counts?.transactions || 0}</span>
+                </div>
+                <div style={{ background: '#ffffff', padding: '8px 10px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', display: 'block' }}>{isGu ? 'વર્ષો' : 'Years'}</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 800, color: '#2563eb' }}>{previewData.counts?.accountingYears || 0}</span>
+                </div>
+              </div>
+
+              <Typography.Text type="secondary" style={{ fontSize: '0.74rem' }}>
+                📅 {isGu ? 'બેકઅપ તારીખ' : 'Exported on'}: {new Date(previewData.exportedAt).toLocaleString('en-IN')}
+              </Typography.Text>
+            </div>
+          )}
+
+          {/* Warning Message */}
+          <Alert
+            type="warning"
+            showIcon
+            icon={<AlertTriangle size={16} color="#d97706" />}
+            message={
+              <span style={{ fontSize: '0.8rem' }}>
+                {isGu
+                  ? 'આ ક્રિયા દ્વારા ડેટાબેઝમાં તમામ પાર્ટીઓ, વ્યવહારો અને ખાતાઓ આ એક્સેલ ફાઇલ મુજબ પુનઃસ્થાપિત (Restore) થશે.'
+                  : 'Restoring will merge and synchronize all records with the data inside this Excel workbook.'}
+              </span>
+            }
+            style={{ borderRadius: 10 }}
+          />
+
+          {/* Modal Actions */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
+            <Button
+              onClick={() => {
+                setImportModalVisible(false)
+                setImportFile(null)
+                setImportPassword('')
+                setPreviewData(null)
+              }}
+              disabled={restoringExcel}
+              style={{ borderRadius: 8 }}
+            >
+              {t('general.cancel')}
+            </Button>
+            <Button
+              type="primary"
+              danger
+              icon={<RefreshCw size={15} />}
+              loading={restoringExcel}
+              disabled={!importFile}
+              onClick={handleConfirmImportExcel}
+              style={{ borderRadius: 8, fontWeight: 600 }}
+            >
+              {restoringExcel ? t('settings.restoring') : t('settings.import_confirm_btn')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
