@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Button, Card, Col, Input, Modal, Row, Select, Table, Tag, Typography, Space, DatePicker } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { Plus, CheckCircle, Edit, Trash2 } from 'lucide-react'
+import { Plus, CheckCircle, Edit, Trash2, FileText } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { formatCurrency } from '../data/mockData'
+import { exportCashBookPDF } from '../lib/pdfReportGenerator'
 import type { User, AccountingYear } from '../types'
 import dayjs from 'dayjs'
 import TransliteratedInput from './TransliteratedInput'
@@ -144,8 +145,10 @@ export default function CashBook({ currentUser }: CashBookProps) {
     {
       title: t('general.action'),
       key: 'action',
+      fixed: 'right',
+      width: 280,
       render: (_: unknown, record: AccountingYear) => (
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap' }}>
           {record.status !== 'active' && (
             <Button
               size="small"
@@ -195,9 +198,18 @@ export default function CashBook({ currentUser }: CashBookProps) {
             {years.length} {t('year.records_count')}
           </Typography.Text>
         </div>
-        <Button type="primary" icon={<Plus size={14} />} onClick={() => { setForm({ ...emptyForm }); setEditId(null); setShowModal(true) }}>
-          {t('year.add')}
-        </Button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button
+            icon={<FileText size={14} />}
+            onClick={() => exportCashBookPDF(years, selectedYear, state.settings, state.language === 'gu')}
+            style={{ fontWeight: 600 }}
+          >
+            PDF
+          </Button>
+          <Button type="primary" icon={<Plus size={14} />} onClick={() => { setForm({ ...emptyForm }); setEditId(null); setShowModal(true) }}>
+            {t('year.add')}
+          </Button>
+        </div>
       </div>
 
       {selectedYear && (

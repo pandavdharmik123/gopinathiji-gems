@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Button, Input, Modal, Select, Table, Tag, Typography, DatePicker } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { Plus, Search, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, FileText } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { PAYMENT_MODES, EXPENSE_CATEGORIES, formatCurrency, todayStr } from '../data/mockData'
+import { exportExpensePDF } from '../lib/pdfReportGenerator'
 import type { Transaction, User } from '../types'
 import dayjs from 'dayjs'
 import TransliteratedInput from './TransliteratedInput'
@@ -159,6 +160,8 @@ export default function Expense({ currentUser }: ExpenseProps) {
     {
       title: t('general.action'),
       key: 'action',
+      fixed: 'right',
+      width: 140,
       render: (_: unknown, record: Transaction) => (
         <div style={{ display: 'flex', gap: 6 }}>
           <Button size="small" icon={<Pencil size={13} />} onClick={() => handleEdit(record)}>{t('general.edit')}</Button>
@@ -204,6 +207,13 @@ export default function Expense({ currentUser }: ExpenseProps) {
             value={filterDate ? dayjs(filterDate) : null}
             onChange={(date) => setFilterDate(date ? date.format('YYYY-MM-DD') : '')}
           />
+          <Button
+            icon={<FileText size={14} />}
+            onClick={() => exportExpensePDF(filtered, state.settings, selectedYear, state.language === 'gu')}
+            style={{ fontWeight: 600 }}
+          >
+            PDF
+          </Button>
           <Button
             type="primary"
             icon={<Plus size={14} />}

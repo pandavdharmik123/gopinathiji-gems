@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Button, Input, Modal, Select, Table, Tag, Typography, DatePicker } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { Plus, Search, Pencil, Trash2, Download, X } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, Download, FileText, X } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { PAYMENT_MODES, INCOME_CATEGORIES, EXPENSE_CATEGORIES, formatCurrency, todayStr } from '../data/mockData'
+import { exportTransactionsPDF } from '../lib/pdfReportGenerator'
 import type { Transaction, User } from '../types'
 import dayjs from 'dayjs'
 import TransliteratedInput from './TransliteratedInput'
@@ -122,23 +123,14 @@ export default function Transactions({ currentUser }: TransactionsProps) {
     }
   }
 
-  const exportCSV = () => {
-    const headers = [t('general.voucher'), t('general.date'), state.language === 'gu' ? 'પ્રકાર' : 'Type', t('general.party'), t('general.category'), t('general.payment'), t('general.description'), t('general.amount')]
-    const rows = filtered.map(t => [t.voucherNo, t.date, txnTypeLabel[t.type], t.partyName, t.category, t.paymentMode, t.description, t.amount].join(','))
-    const csv = [headers.join(','), ...rows].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = `transactions-${todayStr()}.csv`; a.click()
-    URL.revokeObjectURL(url)
-  }
-
   const hasFilters = search || filterType || filterMode || filterDateFrom || filterDateTo
   const categories = state.expenseCategories.map(c => c.name)
 
   const actionColumn: ColumnsType<Transaction>[number] = {
     title: t('general.action'),
     key: 'action',
+    fixed: 'right',
+    width: 140,
     render: (_: unknown, record: Transaction) => (
       <div style={{ display: 'flex', gap: 6 }}>
         <Button size="small" icon={<Pencil size={13} />} onClick={() => handleEdit(record)}>{t('general.edit')}</Button>
@@ -222,7 +214,13 @@ export default function Transactions({ currentUser }: TransactionsProps) {
           </Typography.Text>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Button icon={<Download size={14} />} onClick={exportCSV}>CSV</Button>
+          <Button
+            icon={<FileText size={14} />}
+            onClick={() => exportTransactionsPDF(filtered, state.settings, selectedYear, state.language === 'gu')}
+            style={{ fontWeight: 600 }}
+          >
+            PDF
+          </Button>
           {currentUser.role !== 'employee' && (
             <Button type="primary" icon={<Plus size={14} />} onClick={() => { setForm({ ...emptyForm }); setEditId(null); setShowModal(true) }}>
               {t('txn.add')}

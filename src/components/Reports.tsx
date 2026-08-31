@@ -16,6 +16,7 @@ import type { ColumnsType } from 'antd/es/table'
 import {
   Printer,
   Download,
+  FileText,
   TrendingUp,
   TrendingDown,
   DollarSign,
@@ -27,6 +28,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { EXPENSE_CATEGORIES, formatCurrency, todayStr } from '../data/mockData'
+import { exportComprehensiveReportsPDF } from '../lib/pdfReportGenerator'
 import { getGujaratiTithi } from '../lib/gujaratiCalendar'
 import TransliteratedInput from './TransliteratedInput'
 import type { Transaction } from '../types'
@@ -192,23 +194,6 @@ export default function Reports() {
     })
     return { totalReceivable, totalPayable }
   }, [outstandingData])
-
-  // CSV Exporter for currently filtered records
-  const exportCSV = () => {
-    const rows = [
-      [t('general.voucher'), t('general.date'), isGu ? 'પ્રકાર' : 'Type', t('general.party'), t('general.category'), t('general.payment'), t('general.amount'), t('general.description')],
-      ...filteredTxns.map(t => [t.voucherNo, t.date, t.type, t.partyName, t.category, t.paymentMode, String(t.amount), t.description])
-    ]
-
-    const csvContent = '\uFEFF' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `report-${todayStr()}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
 
   // Render Table Columns
   const transactionColumns: ColumnsType<Transaction> = [
@@ -391,11 +376,13 @@ export default function Reports() {
 
         {/* Global Header Actions */}
         <Space size="small" wrap>
-          <Button icon={<Printer size={15} />} onClick={() => window.print()} style={{ borderRadius: 8 }}>
+          <Button
+            type="primary"
+            icon={<FileText size={15} />}
+            onClick={() => exportComprehensiveReportsPDF(filteredTxns, state.parties, state.settings, selectedYear, datePreset !== 'all' ? `${dateFrom} ~ ${dateTo}` : undefined, state.language === 'gu')}
+            style={{ borderRadius: 8, fontWeight: 600 }}
+          >
             {t('reports.print_pdf')}
-          </Button>
-          <Button type="primary" icon={<Download size={15} />} onClick={exportCSV} style={{ borderRadius: 8 }}>
-            {isGu ? 'CSV ડાઉનલોડ' : 'Export CSV'}
           </Button>
           {activeFiltersCount > 0 && (
             <Button

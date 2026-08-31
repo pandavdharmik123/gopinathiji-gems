@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Select, Input, Button, Card, Table, Tag, Typography, Row, Col, Space, DatePicker } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { Download, Printer, X, BookOpen } from 'lucide-react'
+import { Download, FileText, X, BookOpen } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { formatCurrency } from '../data/mockData'
+import { exportPartyLedgerPDF } from '../lib/pdfReportGenerator'
 import dayjs from 'dayjs'
 
 interface LedgerRow {
@@ -91,25 +92,6 @@ export default function Ledger() {
   const totalDebit = ledgerRows.reduce((s, r) => s + r.debit, 0)
   const netBalance = totalCredit - totalDebit
 
-  const exportCSV = () => {
-    if (!party) return
-    const headers = [t('general.voucher'), t('general.date'), t('general.description'), t('ledger.credit'), t('ledger.debit'), state.language === 'gu' ? 'બેલેન્સ' : 'Balance']
-    const rows = ledgerRows.map(r => [r.voucherNo, r.date, r.description, r.credit, r.debit, r.balance].join(','))
-    const csv = [
-      `${state.language === 'gu' ? 'પાર્ટી લેજર' : 'Party Ledger'}: ${party.name}`,
-      headers.join(','),
-      ...rows
-    ].join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `ledger-${party.name.replace(/\s+/g, '-')}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   const columns: ColumnsType<LedgerRow> = [
     {
       title: t('general.voucher'),
@@ -178,11 +160,13 @@ export default function Ledger() {
           )}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Button icon={<Download size={14} />} onClick={exportCSV} disabled={!party}>
-            CSV
-          </Button>
-          <Button icon={<Printer size={14} />} onClick={() => window.print()} disabled={!party}>
-            {t('reports.print_pdf')}
+          <Button
+            icon={<FileText size={14} />}
+            onClick={() => party && exportPartyLedgerPDF(party, yearTxns, state.settings, selectedYear, state.language === 'gu')}
+            disabled={!party}
+            style={{ fontWeight: 600 }}
+          >
+            PDF
           </Button>
         </div>
       </div>

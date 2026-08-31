@@ -135,6 +135,8 @@ export default function Users({ currentUser }: UsersProps) {
     {
       title: t('general.action'),
       key: 'action',
+      fixed: 'right',
+      width: 170,
       render: (_: unknown, record: User) => (
         <div style={{ display: 'flex', gap: 6 }}>
           <Button size="small" icon={<Pencil size={13} />} onClick={() => handleEdit(record)}>{t('general.edit')}</Button>

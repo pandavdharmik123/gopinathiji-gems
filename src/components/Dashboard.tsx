@@ -1,10 +1,11 @@
 import type React from 'react'
-import { Card, Col, Row, Table, Tag, Typography, Space, Alert } from 'antd'
+import { Card, Col, Row, Table, Tag, Typography, Space, Alert, Button } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { TrendingUp, TrendingDown, DollarSign, Wallet, CalendarDays, BookOpen, Clock, CheckCircle, Landmark, Coins } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, Wallet, CalendarDays, BookOpen, Clock, CheckCircle, Landmark, Coins, FileText } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { formatCurrency, todayStr } from '../data/mockData'
 import { getGujaratiTithi } from '../lib/gujaratiCalendar'
+import { exportDashboardPDF } from '../lib/pdfReportGenerator'
 import type { User } from '../types'
 import type { Page } from './Sidebar'
 
@@ -110,6 +111,18 @@ export default function Dashboard({ currentUser }: DashboardProps) {
   const bankProfit = bankIncome - bankExpense
   const openingBankBalance = selectedYear ? Number(selectedYear.openingBankBalance || 0) : 0
   const bankBalance = openingBankBalance + bankIncome - bankExpense
+
+  // Party Receivables & Payables scoped to year
+  let totalReceivable = 0
+  let totalPayable = 0
+  state.parties.forEach(p => {
+    const partyTxns = yearTxns.filter(t => t.partyId === p.id || t.partyName === p.name)
+    const inc = partyTxns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+    const exp = partyTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+    const bal = inc - exp
+    if (bal > 0) totalReceivable += bal
+    if (bal < 0) totalPayable += Math.abs(bal)
+  })
 
   // Recent transactions scoped to the active year
   const recentTxns = [...yearTxns].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5)
@@ -232,7 +245,7 @@ export default function Dashboard({ currentUser }: DashboardProps) {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
         <div>
           <Typography.Title level={3} style={{ margin: 0, fontWeight: 700, color: 'var(--foreground)' }}>
             {t('nav.dashboard')}
@@ -246,6 +259,22 @@ export default function Dashboard({ currentUser }: DashboardProps) {
             )}
           </Typography.Text>
         </div>
+
+        <Button
+          icon={<FileText size={15} />}
+          onClick={() => exportDashboardPDF({
+            yearIncome,
+            yearExpense,
+            yearProfit,
+            cashBalance,
+            bankBalance,
+            totalReceivable,
+            totalPayable
+          }, recentTxns, state.settings, selectedYear, state.language === 'gu')}
+          style={{ borderRadius: 8, fontWeight: 600 }}
+        >
+          {state.language === 'gu' ? 'પીડીએફ સારાંશ' : 'PDF Summary'}
+        </Button>
       </div>
 
       {/* Alerts */}

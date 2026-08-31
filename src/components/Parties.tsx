@@ -24,10 +24,15 @@ import {
   FileText,
   User as UserIcon,
   Building2,
-  RotateCcw
+  RotateCcw,
+  Sparkles,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Mail
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { PARTY_CATEGORIES, formatCurrency } from '../data/mockData'
+import { exportPartiesPDF } from '../lib/pdfReportGenerator'
 import type { Party, User as UserType } from '../types'
 import TransliteratedInput from './TransliteratedInput'
 
@@ -399,6 +404,19 @@ export default function Parties({ currentUser }: PartiesProps) {
               <strong style={{ color: '#dc2626', fontSize: '0.9rem' }}>-{formatCurrency(totalPayable)}</strong>
             </div>
           </div>
+
+          <Button
+            icon={<FileText size={15} />}
+            onClick={() => exportPartiesPDF(filtered, state.transactions, state.settings, state.language === 'gu')}
+            style={{
+              borderRadius: 8,
+              fontWeight: 600,
+              height: 38,
+              padding: '0 16px'
+            }}
+          >
+            PDF
+          </Button>
 
           <Button
             type="primary"
