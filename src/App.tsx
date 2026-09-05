@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
-import { Alert, Avatar, Breadcrumb, Button, Layout, Space, Typography, Select } from 'antd'
-import { Menu as MenuIcon, Languages } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Alert, Avatar, Breadcrumb, Button, Layout, Space, Typography, Select, Popover, Tag, notification } from 'antd'
+import { Menu as MenuIcon, Languages, ChevronDown, User as UserIcon, LogOut } from 'lucide-react'
 import { AppProvider, useApp } from './store/AppContext'
 import type { User } from './types'
-import { api, clearToken, getToken } from './lib/api'
+import { api, clearToken, getToken, getTokenExp, isTokenExpired } from './lib/api'
 import Login from './components/Login'
 import Sidebar, { type Page } from './components/Sidebar'
 import Dashboard from './components/Dashboard'
@@ -18,6 +18,7 @@ import AuditLog from './components/AuditLog'
 import Settings from './components/Settings'
 import Transactions from './components/Transactions'
 import CalendarView from './components/CalendarView'
+import Profile from './components/Profile'
 import LoadingScreen from './components/LoadingScreen'
 
 const PAGE_TO_ROUTE: Record<Page, string> = {
@@ -33,6 +34,7 @@ const PAGE_TO_ROUTE: Record<Page, string> = {
   users: '/users',
   settings: '/settings',
   audit: '/audit',
+  profile: '/profile',
 }
 
 const ROUTE_TO_PAGE: Record<string, Page> = {
@@ -49,6 +51,7 @@ const ROUTE_TO_PAGE: Record<string, Page> = {
   '/users': 'users',
   '/settings': 'settings',
   '/audit': 'audit',
+  '/profile': 'profile',
 }
 
 function getPageFromPath(pathname: string): Page {
@@ -70,6 +73,21 @@ function AppInner() {
   const [authLoading, setAuthLoading] = useState(true)
   const [activePage, setActivePageInternal] = useState<Page>(() => getPageFromPath(window.location.pathname))
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+
+  const handleLogout = useCallback((reason?: 'expired' | 'manual') => {
+    clearToken()
+    setCurrentUser(null)
+    resetDataLoaded()
+    if (reason === 'expired') {
+      notification.warning({
+        message: t('auth.session_expired_title'),
+        description: t('auth.session_expired'),
+        placement: 'topRight',
+        duration: 6,
+      })
+    }
+  }, [resetDataLoaded, t])
 
   const handleNavigate = (page: Page, replace = false) => {
     setActivePageInternal(page)
@@ -102,7 +120,9 @@ function AppInner() {
   useEffect(() => {
     let mounted = true
     async function restoreSession() {
-      if (!getToken()) {
+      const token = getToken()
+      if (!token || isTokenExpired(token)) {
+        clearToken()
         setAuthLoading(false)
         return
       }
@@ -118,6 +138,51 @@ function AppInner() {
     void restoreSession()
     return () => { mounted = false }
   }, [])
+
+  // Auto-logout watcher: schedules timeout for token expiry & checks on visibility/focus
+  useEffect(() => {
+    if (!currentUser) return
+
+    const checkExpiry = () => {
+      if (isTokenExpired()) {
+        handleLogout('expired')
+        return true
+      }
+      return false
+    }
+
+    if (checkExpiry()) return
+
+    const expMs = getTokenExp()
+    let timer: number | undefined
+    if (expMs) {
+      const delay = Math.max(0, expMs - Date.now())
+      timer = window.setTimeout(() => {
+        handleLogout('expired')
+      }, delay)
+    }
+
+    const handleAuthExpiredEvent = () => {
+      handleLogout('expired')
+    }
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        checkExpiry()
+      }
+    }
+
+    window.addEventListener('auth:expired', handleAuthExpiredEvent)
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus)
+    window.addEventListener('focus', handleVisibilityOrFocus)
+
+    return () => {
+      if (timer) window.clearTimeout(timer)
+      window.removeEventListener('auth:expired', handleAuthExpiredEvent)
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus)
+      window.removeEventListener('focus', handleVisibilityOrFocus)
+    }
+  }, [currentUser, handleLogout])
 
   // Fetch initial data once user is authenticated
   useEffect(() => {
@@ -144,7 +209,7 @@ function AppInner() {
 
   const renderPage = () => {
     switch (activePage) {
-      case 'dashboard': return <Dashboard currentUser={currentUser} onNavigate={handleNavigate} />
+      case 'dashboard': return <Dashboard currentUser={currentUser} onNavigate={handleNavigate} onUserUpdate={setCurrentUser} />
       case 'income': return <Income currentUser={currentUser} />
       case 'expense': return <Expense currentUser={currentUser} />
       case 'transactions': return <Transactions currentUser={currentUser} />
@@ -156,7 +221,8 @@ function AppInner() {
       case 'users': return <Users currentUser={currentUser} />
       case 'settings': return <Settings currentUser={currentUser} />
       case 'calendar': return <CalendarView />
-      default: return <Dashboard currentUser={currentUser} onNavigate={handleNavigate} />
+      case 'profile': return <Profile currentUser={currentUser} onUserUpdate={setCurrentUser} />
+      default: return <Dashboard currentUser={currentUser} onNavigate={handleNavigate} onUserUpdate={setCurrentUser} />
     }
   }
 
@@ -169,13 +235,122 @@ function AppInner() {
     return t('nav.' + page)
   }
 
+  const userMenuContent = (
+    <div style={{ width: 230, overflow: 'hidden' }}>
+      {/* Header Info */}
+      <div style={{ padding: '14px 16px 12px', background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Avatar
+            size={38}
+            style={{
+              background: 'linear-gradient(135deg, #102a83 0%, #00a8ff 100%)',
+              color: '#ffffff',
+              fontWeight: 800,
+              fontSize: 16,
+              boxShadow: '0 2px 8px rgba(16, 42, 131, 0.2)',
+            }}
+          >
+            {currentUser.name.charAt(0).toUpperCase()}
+          </Avatar>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <Typography.Text strong ellipsis style={{ display: 'block', fontSize: '0.9rem', color: '#0f172a' }}>
+              {currentUser.name}
+            </Typography.Text>
+            <Typography.Text type="secondary" ellipsis style={{ display: 'block', fontSize: '0.74rem', marginTop: -2 }}>
+              @{currentUser.username}
+            </Typography.Text>
+          </div>
+        </div>
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Tag
+            style={{
+              margin: 0,
+              fontSize: '0.7rem',
+              padding: '1px 8px',
+              borderRadius: 6,
+              fontWeight: 600,
+              border: 'none',
+              background: 'rgba(16, 42, 131, 0.08)',
+              color: '#102a83',
+            }}
+          >
+            {t('role.' + currentUser.role)}
+          </Tag>
+          <Typography.Text type="secondary" style={{ fontSize: '0.7rem' }}>
+            ● {t('general.active')}
+          </Typography.Text>
+        </div>
+      </div>
+
+      {/* Menu Actions */}
+      <div style={{ padding: '6px' }}>
+        <button
+          type="button"
+          onClick={() => {
+            setUserMenuOpen(false)
+            handleNavigate('profile')
+          }}
+          className="user-popover-item"
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '8px 12px',
+            borderRadius: 8,
+            border: 'none',
+            background: activePage === 'profile' ? 'rgba(16, 42, 131, 0.08)' : 'transparent',
+            cursor: 'pointer',
+            fontSize: '0.84rem',
+            fontWeight: 600,
+            color: '#1e293b',
+            textAlign: 'left',
+            transition: 'background 0.15s ease',
+          }}
+        >
+          <UserIcon size={16} color="#00a8ff" />
+          <span>{t('nav.profile')}</span>
+        </button>
+
+        <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+
+        <button
+          type="button"
+          onClick={() => {
+            setUserMenuOpen(false)
+            handleLogout('manual')
+          }}
+          className="user-popover-item danger"
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '8px 12px',
+            borderRadius: 8,
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            fontSize: '0.84rem',
+            fontWeight: 600,
+            color: '#dc2626',
+            textAlign: 'left',
+            transition: 'background 0.15s ease',
+          }}
+        >
+          <LogOut size={16} color="#dc2626" />
+          <span>{t('nav.logout')}</span>
+        </button>
+      </div>
+    </div>
+  )
+
   return (
     <Layout className="app-layout">
       <Sidebar
         currentUser={currentUser}
         activePage={activePage}
         onNavigate={handleNavigate}
-        onLogout={() => { clearToken(); setCurrentUser(null); resetDataLoaded() }}
         mobileOpen={mobileMenuOpen}
         onMobileClose={() => setMobileMenuOpen(false)}
       />
@@ -192,7 +367,7 @@ function AppInner() {
             <Breadcrumb className="app-breadcrumb" items={[{ title: state.settings.name }, { title: getPageTitle(activePage) }]} />
           </Space>
 
-          <Space size={16}>
+          <Space size={14}>
             <Select
               className="year-select"
               placeholder={t('nav.accountingYears')}
@@ -214,12 +389,57 @@ function AppInner() {
             </Button>
 
             <Typography.Text type="secondary" className="date-pill">{dateDisplay}</Typography.Text>
-            <Space size={8}>
-              <Avatar style={{ background: 'var(--muted)', color: 'var(--primary)', fontWeight: 700 }}>
-                {currentUser.name.charAt(0)}
-              </Avatar>
-              <Typography.Text strong className="user-name">{currentUser.name}</Typography.Text>
-            </Space>
+
+            <Popover
+              content={userMenuContent}
+              trigger="click"
+              placement="bottomRight"
+              open={userMenuOpen}
+              onOpenChange={setUserMenuOpen}
+              styles={{
+                body: { padding: 0, overflow: 'hidden', borderRadius: 12, boxShadow: '0 10px 28px rgba(15, 23, 42, 0.12)' }
+              }}
+            >
+              <div
+                className="header-user-chip"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  cursor: 'pointer',
+                  padding: '4px 10px 4px 6px',
+                  borderRadius: 20,
+                  background: userMenuOpen || activePage === 'profile' ? 'rgba(16, 42, 131, 0.08)' : 'var(--muted)',
+                  border: `1px solid ${userMenuOpen || activePage === 'profile' ? '#102a8330' : 'var(--border)'}`,
+                  transition: 'all 0.2s ease',
+                  userSelect: 'none',
+                }}
+              >
+                <Avatar
+                  size={26}
+                  style={{
+                    background: 'linear-gradient(135deg, #102a83 0%, #00a8ff 100%)',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    boxShadow: '0 2px 6px rgba(16, 42, 131, 0.25)',
+                  }}
+                >
+                  {currentUser.name.charAt(0).toUpperCase()}
+                </Avatar>
+                <Typography.Text strong style={{ fontSize: '0.84rem', color: '#1e293b' }}>
+                  {currentUser.name}
+                </Typography.Text>
+                <ChevronDown
+                  size={14}
+                  color="#64748b"
+                  style={{
+                    transition: 'transform 0.2s ease',
+                    transform: userMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  }}
+                />
+              </div>
+            </Popover>
           </Space>
         </Layout.Header>
 

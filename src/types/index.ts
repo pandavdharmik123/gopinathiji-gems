@@ -7,6 +7,8 @@ export interface User {
   role: UserRole
   email: string
   status: 'active' | 'inactive'
+  hasPin?: boolean
+  twoFactorEnabled?: boolean
   createdAt: string
 }
 

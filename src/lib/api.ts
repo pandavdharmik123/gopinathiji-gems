@@ -10,7 +10,16 @@ interface ApiEnvelope<T> {
   user?: User
   token?: string
   message?: string
+  require2FA?: boolean
+  tempToken?: string
+  secret?: string
+  qrCodeUrl?: string
+  otpauthUrl?: string
 }
+
+export type LoginResult =
+  | { require2FA: false; user: User }
+  | { require2FA: true; tempToken: string; user?: Partial<User> }
 
 export class ApiError extends Error {
   status: number
@@ -34,6 +43,53 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY)
 }
 
+export interface DecodedJwtPayload {
+  userId?: string
+  username?: string
+  role?: string
+  exp?: number
+  iat?: number
+  [key: string]: any
+}
+
+export function getTokenPayload(token?: string | null): DecodedJwtPayload | null {
+  const t = token ?? getToken()
+  if (!t) return null
+  try {
+    const parts = t.split('.')
+    if (parts.length < 2) return null
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    )
+    return JSON.parse(jsonPayload)
+  } catch {
+    return null
+  }
+}
+
+export function getTokenExp(token?: string | null): number | null {
+  const payload = getTokenPayload(token)
+  if (!payload || typeof payload.exp !== 'number') return null
+  return payload.exp * 1000
+}
+
+export function isTokenExpired(token?: string | null): boolean {
+  const expMs = getTokenExp(token)
+  if (!expMs) return true
+  return Date.now() >= expMs - 1000
+}
+
+export function notifyAuthExpired(message?: string) {
+  clearToken()
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('auth:expired', { detail: { message } }))
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken()
   const headers = new Headers(options.headers)
@@ -46,7 +102,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const message = typeof body === 'object' && body?.message ? body.message : 'Request failed'
-    if (response.status === 401) clearToken()
+    if (response.status === 401) {
+      notifyAuthExpired(message)
+    }
     throw new ApiError(message, response.status)
   }
 
@@ -70,6 +128,8 @@ function normalizeUser(user: any): User {
     role: user.role,
     email: user.email,
     status: user.status,
+    hasPin: Boolean(user.hasPin),
+    twoFactorEnabled: Boolean(user.twoFactorEnabled),
     createdAt: dateOnly(user.createdAt),
   }
 }
@@ -172,10 +232,30 @@ async function getData<T>(path: string, normalize: (item: any) => T): Promise<T[
 }
 
 export const api = {
-  async login(username: string, password: string) {
+  async login(username: string, password: string): Promise<LoginResult> {
     const envelope = await request<ApiEnvelope<never>>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
+    })
+    if (envelope.require2FA && envelope.tempToken) {
+      return {
+        require2FA: true,
+        tempToken: envelope.tempToken,
+        user: envelope.user ? normalizeUser(envelope.user) : undefined,
+      }
+    }
+    if (!envelope.token || !envelope.user) throw new ApiError('Invalid login response', 500)
+    setToken(envelope.token)
+    return {
+      require2FA: false,
+      user: normalizeUser(envelope.user),
+    }
+  },
+
+  async login2FA(tempToken: string, code: string): Promise<User> {
+    const envelope = await request<ApiEnvelope<never>>('/auth/login/2fa', {
+      method: 'POST',
+      body: JSON.stringify({ tempToken, code }),
     })
     if (!envelope.token || !envelope.user) throw new ApiError('Invalid login response', 500)
     setToken(envelope.token)
@@ -186,6 +266,72 @@ export const api = {
     const envelope = await request<ApiEnvelope<never>>('/auth/me')
     if (!envelope.user) throw new ApiError('Invalid user response', 500)
     return normalizeUser(envelope.user)
+  },
+
+  auth: {
+    changePassword: async (currentPassword: string, newPassword: string) => {
+      const envelope = await request<ApiEnvelope<never>>('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      })
+      return envelope
+    },
+    updateProfile: async (data: { name?: string; email?: string }) => {
+      const envelope = await request<ApiEnvelope<never>>('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      })
+      if (!envelope.user) throw new ApiError('Invalid user response', 500)
+      return normalizeUser(envelope.user)
+    },
+    verifyPin: async (pin: string) => {
+      const envelope = await request<ApiEnvelope<never>>('/auth/pin/verify', {
+        method: 'POST',
+        body: JSON.stringify({ pin }),
+      })
+      return envelope
+    },
+    setupPin: async (pin: string) => {
+      const envelope = await request<ApiEnvelope<never>>('/auth/pin/setup', {
+        method: 'POST',
+        body: JSON.stringify({ pin }),
+      })
+      return envelope
+    },
+    changePin: async (data: { currentPin?: string; password?: string; newPin: string }) => {
+      const envelope = await request<ApiEnvelope<never>>('/auth/pin/change', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      })
+      return envelope
+    },
+    resetPin: async (password: string, newPin: string) => {
+      const envelope = await request<ApiEnvelope<never>>('/auth/pin/reset', {
+        method: 'POST',
+        body: JSON.stringify({ password, newPin }),
+      })
+      return envelope
+    },
+    get2FASetup: async () => {
+      const envelope = await request<ApiEnvelope<never>>('/auth/2fa/setup')
+      return envelope
+    },
+    verify2FASetup: async (secret: string, code: string) => {
+      const envelope = await request<ApiEnvelope<never>>('/auth/2fa/verify-setup', {
+        method: 'POST',
+        body: JSON.stringify({ secret, code }),
+      })
+      if (!envelope.user) throw new ApiError('Invalid user response', 500)
+      return normalizeUser(envelope.user)
+    },
+    disable2FA: async (data: { password?: string; code?: string }) => {
+      const envelope = await request<ApiEnvelope<never>>('/auth/2fa/disable', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      })
+      if (!envelope.user) throw new ApiError('Invalid user response', 500)
+      return normalizeUser(envelope.user)
+    },
   },
 
   users: {
@@ -288,6 +434,9 @@ export const api = {
           const errJson = await response.json()
           if (errJson?.message) errorMsg = errJson.message
         } catch {}
+        if (response.status === 401) {
+          notifyAuthExpired(errorMsg)
+        }
         throw new ApiError(errorMsg, response.status)
       }
 

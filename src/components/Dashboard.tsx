@@ -1,17 +1,20 @@
 import type React from 'react'
-import { Card, Col, Row, Table, Tag, Typography, Space, Alert, Button } from 'antd'
+import { useState } from 'react'
+import { Card, Col, Row, Table, Tag, Typography, Space, Alert, Button, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { TrendingUp, TrendingDown, DollarSign, Wallet, CalendarDays, BookOpen, Clock, CheckCircle, Landmark, Coins, FileText } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, Wallet, CalendarDays, BookOpen, Clock, CheckCircle, Landmark, Coins, FileText, Lock, EyeOff, ShieldCheck, Smartphone, CreditCard } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { formatCurrency, todayStr } from '../data/mockData'
 import { getGujaratiTithi } from '../lib/gujaratiCalendar'
 import { exportDashboardPDF } from '../lib/pdfReportGenerator'
 import type { User } from '../types'
 import type { Page } from './Sidebar'
+import PinVerificationModal from './PinVerificationModal'
 
 interface DashboardProps {
   currentUser: User
   onNavigate: (page: Page) => void
+  onUserUpdate?: (user: User) => void
 }
 
 interface StatCardProps {
@@ -23,19 +26,23 @@ interface StatCardProps {
   iconBg: string
   icon: React.ReactNode
   trend?: { value: string; up: boolean }
+  onClick?: () => void
+  isLocked?: boolean
 }
 
-function StatCard({ label, value, sub, color, bgColor, iconBg, icon, trend }: StatCardProps) {
+function StatCard({ label, value, sub, color, bgColor, iconBg, icon, trend, onClick, isLocked }: StatCardProps) {
   return (
     <Card 
       bordered={false}
+      onClick={isLocked ? onClick : undefined}
       styles={{ body: { padding: '20px 18px' } }}
       style={{ 
         height: '100%', 
         background: bgColor, 
         border: `1.5px solid ${color}18`, 
         borderRadius: 14,
-        boxShadow: 'none'
+        boxShadow: 'none',
+        cursor: isLocked ? 'pointer' : 'default',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -78,9 +85,19 @@ function StatCard({ label, value, sub, color, bgColor, iconBg, icon, trend }: St
   )
 }
 
-export default function Dashboard({ currentUser }: DashboardProps) {
+export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps) {
   const { state, t } = useApp()
   const { transactions, accountingYears, selectedYearId } = state
+
+  const [isUnlocked, setIsUnlocked] = useState(false)
+  const [pinModalOpen, setPinModalOpen] = useState(false)
+
+  const maskAmount = (val: number | string, prefix = '₹ ') => {
+    if (isUnlocked) {
+      return typeof val === 'number' ? formatCurrency(val) : val
+    }
+    return `${prefix}••••••`
+  }
 
   const today = todayStr()
 
@@ -134,11 +151,45 @@ export default function Dashboard({ currentUser }: DashboardProps) {
   const gujaratiDate = new Date().toLocaleDateString(dateLocale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   const gujaratiTithi = getGujaratiTithi(new Date())
 
-  const paymentModeIcon = (mode: string) => {
-    if (mode === 'cash') return '💵'
-    if (mode === 'bank') return '🏦'
-    if (mode === 'upi') return '📱'
-    return '📄'
+  const renderPaymentModeTag = (mode: string) => {
+    const isGu = state.language === 'gu'
+    switch (mode) {
+      case 'cash':
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.8rem', color: '#15803d', fontWeight: 600 }}>
+            <Coins size={14} color="#15803d" />
+            <span>{isGu ? 'રોકડા' : 'CASH'}</span>
+          </span>
+        )
+      case 'bank':
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.8rem', color: '#0369a1', fontWeight: 600 }}>
+            <Landmark size={14} color="#0369a1" />
+            <span>{isGu ? 'બેંક' : 'BANK'}</span>
+          </span>
+        )
+      case 'upi':
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.8rem', color: '#7e22ce', fontWeight: 600 }}>
+            <Smartphone size={14} color="#7e22ce" />
+            <span>{isGu ? 'યુ.પી.આઈ' : 'UPI'}</span>
+          </span>
+        )
+      case 'cheque':
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.8rem', color: '#c2410c', fontWeight: 600 }}>
+            <CreditCard size={14} color="#c2410c" />
+            <span>{isGu ? 'ચેક' : 'CHEQUE'}</span>
+          </span>
+        )
+      default:
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.8rem', color: 'var(--secondary)' }}>
+            <FileText size={14} />
+            <span>{String(mode).toUpperCase()}</span>
+          </span>
+        )
+    }
   }
 
   const txnTypeColor = (type: string): string => {
@@ -192,7 +243,7 @@ export default function Dashboard({ currentUser }: DashboardProps) {
       title: t('general.payment'),
       dataIndex: 'paymentMode',
       key: 'paymentMode',
-      render: (v: string) => <span>{paymentModeIcon(v)} <span style={{ fontSize: '0.78rem', color: 'var(--secondary)' }}>{v.toUpperCase()}</span></span>,
+      render: (v: string) => renderPaymentModeTag(v),
     },
     {
       title: t('general.amount'),
@@ -201,7 +252,7 @@ export default function Dashboard({ currentUser }: DashboardProps) {
       align: 'right',
       render: (v: number, record) => (
         <span style={{ fontWeight: 700, color: record.type === 'income' ? '#16a34a' : '#dc2626' }}>
-          {record.type === 'income' ? '+' : '-'}{formatCurrency(v)}
+          {record.type === 'income' ? '+' : '-'}{maskAmount(v, '₹ ')}
         </span>
       ),
     },
@@ -260,21 +311,48 @@ export default function Dashboard({ currentUser }: DashboardProps) {
           </Typography.Text>
         </div>
 
-        <Button
-          icon={<FileText size={15} />}
-          onClick={() => exportDashboardPDF({
-            yearIncome,
-            yearExpense,
-            yearProfit,
-            cashBalance,
-            bankBalance,
-            totalReceivable,
-            totalPayable
-          }, recentTxns, state.settings, selectedYear, state.language === 'gu')}
-          style={{ borderRadius: 8, fontWeight: 600 }}
-        >
-          {state.language === 'gu' ? 'પીડીએફ સારાંશ' : 'PDF Summary'}
-        </Button>
+        <Space size={10}>
+          <Button
+            type={isUnlocked ? 'default' : 'primary'}
+            icon={isUnlocked ? <EyeOff size={15} /> : <Lock size={15} />}
+            onClick={() => {
+              if (isUnlocked) {
+                setIsUnlocked(false)
+                message.info(t('pin.lock_success'))
+              } else {
+                setPinModalOpen(true)
+              }
+            }}
+            style={{
+              borderRadius: 8,
+              fontWeight: 700,
+              ...(isUnlocked
+                ? { borderColor: '#0f595c', color: '#0f595c' }
+                : {
+                    background: 'linear-gradient(135deg, #0f595c 0%, #11686c 100%)',
+                    boxShadow: '0 4px 12px rgba(15, 89, 92, 0.25)',
+                  }),
+            }}
+          >
+            {isUnlocked ? t('pin.hide_numbers') : t('pin.show_numbers')}
+          </Button>
+
+          <Button
+            icon={<FileText size={15} />}
+            onClick={() => exportDashboardPDF({
+              yearIncome,
+              yearExpense,
+              yearProfit,
+              cashBalance,
+              bankBalance,
+              totalReceivable,
+              totalPayable
+            }, recentTxns, state.settings, selectedYear, state.language === 'gu')}
+            style={{ borderRadius: 8, fontWeight: 600 }}
+          >
+            {state.language === 'gu' ? 'પીડીએફ સારાંશ' : 'PDF Summary'}
+          </Button>
+        </Space>
       </div>
 
       {/* Alerts */}
@@ -284,7 +362,7 @@ export default function Dashboard({ currentUser }: DashboardProps) {
             <Alert
               type="warning"
               showIcon
-              message={`${t('dash.large_expense_alert')} ${largeExpenses[0].description} — ${formatCurrency(largeExpenses[0].amount)}`}
+              message={`${t('dash.large_expense_alert')} ${largeExpenses[0].description} — ${maskAmount(largeExpenses[0].amount)}`}
             />
           </Col>
         </Row>
@@ -299,33 +377,39 @@ export default function Dashboard({ currentUser }: DashboardProps) {
           <Col xs={24} sm={12} lg={8}>
             <StatCard 
               label={t('dash.total_income')} 
-              value={formatCurrency(yearIncome)} 
-              sub={`${t('dash.cash_income')}: ${formatCurrency(cashIncome)} | ${t('dash.bank_income')}: ${formatCurrency(bankIncome)}`}
+              value={maskAmount(yearIncome)} 
+              sub={`${t('dash.cash_income')}: ${maskAmount(cashIncome)} | ${t('dash.bank_income')}: ${maskAmount(bankIncome)}`}
               color="#15803d" 
               bgColor="#f0fdf4"
               iconBg="#ffffff"
               icon={<TrendingUp size={20} />} 
+              isLocked={!isUnlocked}
+              onClick={() => setPinModalOpen(true)}
             />
           </Col>
           <Col xs={24} sm={12} lg={8}>
             <StatCard 
               label={t('dash.total_expense')} 
-              value={formatCurrency(yearExpense)} 
-              sub={`${t('dash.cash_expense')}: ${formatCurrency(cashExpense)} | ${t('dash.bank_expense')}: ${formatCurrency(bankExpense)}`}
+              value={maskAmount(yearExpense)} 
+              sub={`${t('dash.cash_expense')}: ${maskAmount(cashExpense)} | ${t('dash.bank_expense')}: ${maskAmount(bankExpense)}`}
               color="#ea580c" 
               bgColor="#fff7ed"
               iconBg="#ffffff"
               icon={<TrendingDown size={20} />} 
+              isLocked={!isUnlocked}
+              onClick={() => setPinModalOpen(true)}
             />
           </Col>
           <Col xs={24} sm={12} lg={8}>
             <StatCard 
               label={t('dash.net_profit')} 
-              value={formatCurrency(yearProfit)} 
+              value={maskAmount(yearProfit)} 
               color="#db2777" 
               bgColor="#fdf2f8"
               iconBg="#ffffff"
               icon={<DollarSign size={20} />} 
+              isLocked={!isUnlocked}
+              onClick={() => setPinModalOpen(true)}
             />
           </Col>
         </Row>
@@ -343,34 +427,36 @@ export default function Dashboard({ currentUser }: DashboardProps) {
                 <span style={{ fontWeight: 700, color: '#1e3a8a' }}>{t('dash.cash_overview')}</span>
               </Space>
             }
-            extra={<Tag color="blue" style={{ fontWeight: 600 }}>{t('dash.cash_balance')}: {formatCurrency(cashBalance)}</Tag>}
+            extra={<Tag color="blue" style={{ fontWeight: 600 }}>{t('dash.cash_balance')}: {maskAmount(cashBalance)}</Tag>}
             style={{ height: '100%', borderRadius: 14, border: '1.5px solid #2563eb20', boxShadow: 'none' }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                 <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('year.opening_cash_balance')}</Typography.Text>
-                <Typography.Text style={{ fontWeight: 600, color: 'var(--foreground)' }}>{formatCurrency(openingCashBalance)}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 600, color: 'var(--foreground)' }}>{maskAmount(openingCashBalance)}</Typography.Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                 <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.cash_income')}</Typography.Text>
-                <Typography.Text style={{ fontWeight: 700, color: '#16a34a' }}>+{formatCurrency(cashIncome)}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: '#16a34a' }}>{isUnlocked ? `+${formatCurrency(cashIncome)}` : '+₹ ••••••'}</Typography.Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                 <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.cash_expense')}</Typography.Text>
-                <Typography.Text style={{ fontWeight: 700, color: '#dc2626' }}>-{formatCurrency(cashExpense)}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: '#dc2626' }}>{isUnlocked ? `-${formatCurrency(cashExpense)}` : '-₹ ••••••'}</Typography.Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                 <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.cash_profit')}</Typography.Text>
-                <Typography.Text style={{ fontWeight: 700, color: cashProfit >= 0 ? '#16a34a' : '#dc2626' }}>{formatCurrency(cashProfit)}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: cashProfit >= 0 ? '#16a34a' : '#dc2626' }}>{maskAmount(cashProfit)}</Typography.Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#eff6ff', borderRadius: 10, marginTop: 4, border: '1px solid #bfdbfe' }}>
                 <div>
                   <Typography.Text strong style={{ fontSize: '0.9rem', color: '#1e40af', display: 'block' }}>{t('dash.cash_balance')}</Typography.Text>
                   <Typography.Text style={{ fontSize: '0.72rem', color: '#3b82f6' }}>
-                    {formatCurrency(openingCashBalance)} + {formatCurrency(cashIncome)} - {formatCurrency(cashExpense)}
+                    {isUnlocked
+                      ? `${formatCurrency(openingCashBalance)} + ${formatCurrency(cashIncome)} - ${formatCurrency(cashExpense)}`
+                      : '₹ •••••• + ₹ •••••• - ₹ ••••••'}
                   </Typography.Text>
                 </div>
-                <Typography.Text strong style={{ fontSize: '1.2rem', color: '#1e40af', fontWeight: 800 }}>{formatCurrency(cashBalance)}</Typography.Text>
+                <Typography.Text strong style={{ fontSize: '1.2rem', color: '#1e40af', fontWeight: 800 }}>{maskAmount(cashBalance)}</Typography.Text>
               </div>
             </div>
           </Card>
@@ -386,34 +472,36 @@ export default function Dashboard({ currentUser }: DashboardProps) {
                 <span style={{ fontWeight: 700, color: '#155e75' }}>{t('dash.bank_overview')}</span>
               </Space>
             }
-            extra={<Tag color="cyan" style={{ fontWeight: 600 }}>{t('dash.bank_balance')}: {formatCurrency(bankBalance)}</Tag>}
+            extra={<Tag color="cyan" style={{ fontWeight: 600 }}>{t('dash.bank_balance')}: {maskAmount(bankBalance)}</Tag>}
             style={{ height: '100%', borderRadius: 14, border: '1.5px solid #0891b220', boxShadow: 'none' }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                 <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('year.opening_bank_balance')}</Typography.Text>
-                <Typography.Text style={{ fontWeight: 600, color: 'var(--foreground)' }}>{formatCurrency(openingBankBalance)}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 600, color: 'var(--foreground)' }}>{maskAmount(openingBankBalance)}</Typography.Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                 <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.bank_income')}</Typography.Text>
-                <Typography.Text style={{ fontWeight: 700, color: '#16a34a' }}>+{formatCurrency(bankIncome)}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: '#16a34a' }}>{isUnlocked ? `+${formatCurrency(bankIncome)}` : '+₹ ••••••'}</Typography.Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                 <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.bank_expense')}</Typography.Text>
-                <Typography.Text style={{ fontWeight: 700, color: '#dc2626' }}>-{formatCurrency(bankExpense)}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: '#dc2626' }}>{isUnlocked ? `-${formatCurrency(bankExpense)}` : '-₹ ••••••'}</Typography.Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                 <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.bank_profit')}</Typography.Text>
-                <Typography.Text style={{ fontWeight: 700, color: bankProfit >= 0 ? '#16a34a' : '#dc2626' }}>{formatCurrency(bankProfit)}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: bankProfit >= 0 ? '#16a34a' : '#dc2626' }}>{maskAmount(bankProfit)}</Typography.Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#ecfeff', borderRadius: 10, marginTop: 4, border: '1px solid #a5f3fc' }}>
                 <div>
                   <Typography.Text strong style={{ fontSize: '0.9rem', color: '#0e7490', display: 'block' }}>{t('dash.bank_balance')}</Typography.Text>
                   <Typography.Text style={{ fontSize: '0.72rem', color: '#06b6d4' }}>
-                    {formatCurrency(openingBankBalance)} + {formatCurrency(bankIncome)} - {formatCurrency(bankExpense)}
+                    {isUnlocked
+                      ? `${formatCurrency(openingBankBalance)} + ${formatCurrency(bankIncome)} - ${formatCurrency(bankExpense)}`
+                      : '₹ •••••• + ₹ •••••• - ₹ ••••••'}
                   </Typography.Text>
                 </div>
-                <Typography.Text strong style={{ fontSize: '1.2rem', color: '#0e7490', fontWeight: 800 }}>{formatCurrency(bankBalance)}</Typography.Text>
+                <Typography.Text strong style={{ fontSize: '1.2rem', color: '#0e7490', fontWeight: 800 }}>{maskAmount(bankBalance)}</Typography.Text>
               </div>
             </div>
           </Card>
@@ -434,9 +522,9 @@ export default function Dashboard({ currentUser }: DashboardProps) {
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { label: state.language === 'gu' ? 'આ મહિનાની આવક' : 'Monthly Income', value: formatCurrency(monthIncome), color: '#16a34a' },
-                { label: state.language === 'gu' ? 'આ મહિનાનો ખર્ચ' : 'Monthly Expense', value: formatCurrency(monthExpense), color: '#dc2626' },
-                { label: state.language === 'gu' ? 'મહિનાનો નફો' : 'Monthly Profit', value: formatCurrency(monthProfit), color: monthProfit >= 0 ? '#16a34a' : '#dc2626' },
+                { label: state.language === 'gu' ? 'આ મહિનાની આવક' : 'Monthly Income', value: maskAmount(monthIncome), color: '#16a34a' },
+                { label: state.language === 'gu' ? 'આ મહિનાનો ખર્ચ' : 'Monthly Expense', value: maskAmount(monthExpense), color: '#dc2626' },
+                { label: state.language === 'gu' ? 'મહિનાનો નફો' : 'Monthly Profit', value: maskAmount(monthProfit), color: monthProfit >= 0 ? '#16a34a' : '#dc2626' },
               ].map((item, idx) => (
                 <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: idx !== 2 ? 12 : 0, borderBottom: idx !== 2 ? '1px solid var(--border)' : 'none' }}>
                   <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{item.label}</Typography.Text>
@@ -463,8 +551,8 @@ export default function Dashboard({ currentUser }: DashboardProps) {
                   { label: t('dash.year_name'), value: selectedYear.name },
                   { label: t('dash.start_date'), value: selectedYear.startDate },
                   { label: t('dash.end_date'), value: selectedYear.endDate },
-                  { label: t('year.opening_cash_balance'), value: formatCurrency(selectedYear.openingBalance) },
-                  { label: t('year.opening_bank_balance'), value: formatCurrency(selectedYear.openingBankBalance || 0) },
+                  { label: t('year.opening_cash_balance'), value: maskAmount(selectedYear.openingBalance) },
+                  { label: t('year.opening_bank_balance'), value: maskAmount(selectedYear.openingBankBalance || 0) },
                 ].map(item => (
                   <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                     <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{item.label}</Typography.Text>
@@ -510,6 +598,16 @@ export default function Dashboard({ currentUser }: DashboardProps) {
           scroll={{ x: 'max-content' }}
         />
       </Card>
+
+      {/* PIN Verification / Setup Modal */}
+      <PinVerificationModal
+        open={pinModalOpen}
+        onClose={() => setPinModalOpen(false)}
+        onSuccess={() => setIsUnlocked(true)}
+        currentUser={currentUser}
+        onUserUpdate={onUserUpdate}
+      />
     </div>
   )
 }
+

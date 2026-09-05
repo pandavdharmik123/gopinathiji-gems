@@ -1,5 +1,5 @@
 import type React from 'react'
-import { Avatar, Button, Drawer, Menu, Space, Tag, Typography } from 'antd'
+import { Drawer, Menu, Typography } from 'antd'
 import {
   Activity,
   BarChart3,
@@ -7,7 +7,6 @@ import {
   Building2,
   FileText,
   LayoutDashboard,
-  LogOut,
   ReceiptText,
   Settings,
   TrendingDown,
@@ -18,13 +17,13 @@ import {
 import type { User } from '../types'
 import { useApp } from '../store/AppContext'
 
-export type Page = 'dashboard' | 'income' | 'expense' | 'transactions' | 'cashbook' | 'parties' | 'ledger' | 'reports' | 'users' | 'settings' | 'audit' | 'calendar'
+export type Page = 'dashboard' | 'income' | 'expense' | 'transactions' | 'cashbook' | 'parties' | 'ledger' | 'reports' | 'users' | 'settings' | 'audit' | 'calendar' | 'profile'
 
 interface SidebarProps {
   currentUser: User
   activePage: Page
   onNavigate: (page: Page) => void
-  onLogout: () => void
+  onLogout?: () => void
   mobileOpen: boolean
   onMobileClose: () => void
 }
@@ -42,10 +41,9 @@ const navItems: { page: Page; label: string; icon: React.ReactNode; roles: strin
   { page: 'users', label: 'Users', icon: <UserCheck size={18} />, roles: ['admin'] },
   { page: 'settings', label: 'Settings', icon: <Settings size={18} />, roles: ['admin'] },
   { page: 'cashbook', label: 'Financial Years', icon: <BookOpen size={18} />, roles: ['admin', 'manager'] },
-
 ]
 
-function SidebarContent({ currentUser, activePage, onNavigate, onLogout, onMobileClose }: Omit<SidebarProps, 'mobileOpen'>) {
+function SidebarContent({ currentUser, activePage, onNavigate, onMobileClose }: Omit<SidebarProps, 'mobileOpen' | 'onLogout'>) {
   const { state, t } = useApp()
   const companyName = state.settings.name
   const visible = navItems.filter(item => item.roles.includes(currentUser.role))
@@ -66,7 +64,7 @@ function SidebarContent({ currentUser, activePage, onNavigate, onLogout, onMobil
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', paddingBottom: 16 }}>
         <Typography.Text className="app-sidebar-kicker">{t('nav.menu_title')}</Typography.Text>
         <Menu
           mode="inline"
@@ -82,21 +80,6 @@ function SidebarContent({ currentUser, activePage, onNavigate, onLogout, onMobil
           }))}
           style={{ borderInlineEnd: 0, flex: 1, background: 'transparent' }}
         />
-      </div>
-
-      <div className="app-sidebar-user" style={{ flexShrink: 0 }}>
-        <Space>
-          <Avatar style={{ background: 'var(--muted)', color: 'var(--primary)', fontWeight: 700 }}>
-            {currentUser.name.charAt(0)}
-          </Avatar>
-          <div style={{ minWidth: 0 }}>
-            <Typography.Text strong ellipsis style={{ display: 'block', maxWidth: 142 }}>{currentUser.name}</Typography.Text>
-            <Tag color="cyan" style={{ margin: 0 }}>{t('role.' + currentUser.role)}</Tag>
-          </div>
-        </Space>
-        <Button icon={<LogOut size={16} />} onClick={onLogout} block danger style={{ marginTop: 12 }}>
-          {t('nav.logout')}
-        </Button>
       </div>
     </div>
   )

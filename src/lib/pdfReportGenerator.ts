@@ -125,16 +125,16 @@ export function printPDFReport(options: PDFReportOptions) {
         return `
           <tr style="background: ${bg}; border-bottom: 1px solid #f1f5f9;">
             ${row.map((cell, cIdx) => {
-              const col = sec.columns[cIdx]
-              const align = col?.align || 'left'
-              const valStr = cell === null || cell === undefined ? '' : String(cell)
-              const isAmount = valStr.startsWith('₹') || valStr.startsWith('+₹') || valStr.startsWith('-₹')
-              const isPositive = valStr.startsWith('+')
-              const isNegative = valStr.startsWith('-')
-              const color = isPositive ? '#16a34a' : isNegative ? '#dc2626' : '#1e293b'
-              const fontW = isAmount || cIdx === 1 ? '600' : 'normal'
+          const col = sec.columns[cIdx]
+          const align = col?.align || 'left'
+          const valStr = cell === null || cell === undefined ? '' : String(cell)
+          const isAmount = valStr.startsWith('₹') || valStr.startsWith('+₹') || valStr.startsWith('-₹')
+          const isPositive = valStr.startsWith('+')
+          const isNegative = valStr.startsWith('-')
+          const color = isPositive ? '#16a34a' : isNegative ? '#dc2626' : '#1e293b'
+          const fontW = isAmount || cIdx === 1 ? '600' : 'normal'
 
-              return `
+          return `
                 <td style="
                   padding: 8px 10px;
                   font-size: 12px;
@@ -146,7 +146,7 @@ export function printPDFReport(options: PDFReportOptions) {
                   ${escapeHtml(valStr)}
                 </td>
               `
-            }).join('')}
+        }).join('')}
           </tr>
         `
       }).join('')
@@ -157,10 +157,10 @@ export function printPDFReport(options: PDFReportOptions) {
       summaryHtml = `
         <tr style="background: #f8fafc; border-top: 2px solid #cbd5e1; font-weight: 700;">
           ${sec.summaryRow.map((cell, cIdx) => {
-            const col = sec.columns[cIdx]
-            const align = col?.align || 'left'
-            const valStr = cell === null || cell === undefined ? '' : String(cell)
-            return `
+        const col = sec.columns[cIdx]
+        const align = col?.align || 'left'
+        const valStr = cell === null || cell === undefined ? '' : String(cell)
+        return `
               <td style="
                 padding: 10px;
                 font-size: 12px;
@@ -171,7 +171,7 @@ export function printPDFReport(options: PDFReportOptions) {
                 ${escapeHtml(valStr)}
               </td>
             `
-          }).join('')}
+      }).join('')}
         </tr>
       `
     }
@@ -1047,7 +1047,7 @@ export function exportDashboardPDF(
   ])
 
   printPDFReport({
-    title: isGu ? 'ડેશબોર્ડ નાણાકીય સારાંશ' : 'FINANCIAL DASHBOARD SUMMARY',
+    title: isGu ? 'ડેશબોર્ડ નાણાકીય સારાંશ' : 'DASHBOARD SUMMARY',
     subtitle: isGu ? 'સંપૂર્ણ નાણાકીય સ્થિતિ અને તાજેતરના વ્યવહારો' : 'Executive Business Performance & Cash Flow Summary',
     period: year ? year.name : undefined,
     settings,

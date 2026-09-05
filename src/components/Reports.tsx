@@ -24,7 +24,12 @@ import {
   RotateCcw,
   Scale,
   FileSpreadsheet,
-  Filter
+  Filter,
+  Coins,
+  Landmark,
+  Smartphone,
+  CreditCard,
+  Phone,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { EXPENSE_CATEGORIES, formatCurrency, todayStr } from '../data/mockData'
@@ -247,11 +252,38 @@ export default function Reports() {
       dataIndex: 'paymentMode',
       key: 'paymentMode',
       width: 130,
-      render: (mode: string) => (
-        <span style={{ fontSize: '0.82rem' }}>
-          {mode === 'cash' ? '💵 ' + (isGu ? 'રોકડા' : 'Cash') : '🏦 ' + (isGu ? 'બેંક' : 'Bank')}
-        </span>
-      )
+      render: (mode: string) => {
+        if (mode === 'cash') {
+          return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.82rem', color: '#15803d', fontWeight: 600 }}>
+              <Coins size={14} color="#15803d" />
+              <span>{isGu ? 'રોકડા' : 'Cash'}</span>
+            </span>
+          )
+        }
+        if (mode === 'bank') {
+          return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.82rem', color: '#0369a1', fontWeight: 600 }}>
+              <Landmark size={14} color="#0369a1" />
+              <span>{isGu ? 'બેંક' : 'Bank'}</span>
+            </span>
+          )
+        }
+        if (mode === 'upi') {
+          return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.82rem', color: '#7e22ce', fontWeight: 600 }}>
+              <Smartphone size={14} color="#7e22ce" />
+              <span>{isGu ? 'યુ.પી.આઈ' : 'UPI'}</span>
+            </span>
+          )
+        }
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.82rem', color: '#c2410c', fontWeight: 600 }}>
+            <CreditCard size={14} color="#c2410c" />
+            <span>{isGu ? 'ચેક' : 'Cheque'}</span>
+          </span>
+        )
+      }
     },
     {
       title: t('general.description'),
@@ -282,7 +314,12 @@ export default function Reports() {
       render: (v: string, record) => (
         <div>
           <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{v}</span>
-          {record.mobile && <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>📞 {record.mobile}</div>}
+          {record.mobile && (
+            <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+              <Phone size={12} />
+              <span>{record.mobile}</span>
+            </div>
+          )}
         </div>
       )
     },

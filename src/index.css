@@ -264,6 +264,19 @@ textarea,
   font-size: 12px;
 }
 
+.header-user-chip:hover {
+  background: rgba(16, 42, 131, 0.07) !important;
+  border-color: rgba(16, 42, 131, 0.25) !important;
+}
+
+.user-popover-item:hover {
+  background: #f1f5f9 !important;
+}
+
+.user-popover-item.danger:hover {
+  background: #fef2f2 !important;
+}
+
 /* ── Section header ── */
 .section-header {
   display: flex;
