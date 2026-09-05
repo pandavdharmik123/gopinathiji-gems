@@ -110,7 +110,13 @@ export default function TwoFactorModal({
       onSuccess()
       onClose()
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : t('2fa.invalid_code')
+      const msg =
+        err instanceof ApiError &&
+        err.message &&
+        err.message !== 'Internal server error' &&
+        err.message !== 'Request failed'
+          ? err.message
+          : t('2fa.invalid_code')
       setErrorMsg(msg)
       setCode('')
     } finally {

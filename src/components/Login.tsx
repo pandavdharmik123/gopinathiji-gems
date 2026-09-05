@@ -62,7 +62,13 @@ export default function Login({ onLogin }: LoginProps) {
       const user = await api.login2FA(tempToken, code)
       await onLogin(user)
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : t('2fa.invalid_code')
+      const msg =
+        err instanceof ApiError &&
+        err.message &&
+        err.message !== 'Internal server error' &&
+        err.message !== 'Request failed'
+          ? err.message
+          : t('2fa.invalid_code')
       setError(msg)
       setTwoFactorCode('')
     } finally {

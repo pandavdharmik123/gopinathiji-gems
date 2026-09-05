@@ -338,7 +338,7 @@ const translations = {
     '2fa.login_desc': 'Enter the 6-digit security code from your Authenticator app to complete login.',
     '2fa.login_btn': 'Verify & Login',
     '2fa.back_to_login': 'Back to Login',
-    '2fa.invalid_code': 'Invalid authenticator code. Please check your app and try again.',
+    '2fa.invalid_code': 'Incorrect PIN / Authenticator code. Please check your app and try again.',
   },
   gu: {
     // Brand & General
@@ -679,7 +679,7 @@ const translations = {
     '2fa.login_desc': 'લૉગિન પૂર્ણ કરવા માટે તમારી ઓથેન્ટિકેટર એપમાંથી ૬-અંકનો કોડ દાખલ કરો.',
     '2fa.login_btn': 'ચકાસો અને લૉગિન કરો',
     '2fa.back_to_login': '← લૉગિન પર પાછા જાઓ',
-    '2fa.invalid_code': 'ખોટો ઓથેન્ટિકેટર કોડ. કૃપા કરીને ફરી પ્રયાસ કરો.',
+    '2fa.invalid_code': 'ખોટો PIN / ઓથેન્ટિકેટર કોડ. કૃપા કરીને ફરી પ્રયાસ કરો.',
   }
 }
 

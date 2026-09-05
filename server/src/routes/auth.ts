@@ -133,12 +133,19 @@ router.post('/login/2fa', validateBody(login2FASchema), async (req: Request, res
 
     const user = await prisma.user.findUnique({ where: { id: payload.userId } })
     if (!user || user.status === 'inactive' || !user.twoFactorSecret || !user.twoFactorEnabled) {
-      throw createError('Invalid 2FA request', 401)
+      throw createError('Invalid 2FA request', 400)
     }
 
-    const checkResult = await verifyTotp({ secret: user.twoFactorSecret, token: code })
-    if (!checkResult.valid) {
-      throw createError('Invalid 6-digit authenticator code. Please try again.', 400)
+    let isValid = false
+    try {
+      const checkResult = await verifyTotp({ secret: user.twoFactorSecret, token: code })
+      isValid = Boolean(checkResult?.valid)
+    } catch {
+      isValid = false
+    }
+
+    if (!isValid) {
+      throw createError('Incorrect 6-digit authenticator code. Please try again.', 400)
     }
 
     const authPayload = { userId: user.id, username: user.username, role: user.role }
@@ -379,9 +386,16 @@ router.post('/2fa/verify-setup', authenticate, validateBody(verify2FASetupSchema
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } })
     if (!user) throw createError('User not found', 404)
 
-    const checkResult = await verifyTotp({ secret, token: code })
-    if (!checkResult.valid) {
-      throw createError('Invalid 6-digit authenticator code. Please check your authenticator app and try again.', 400)
+    let isValid = false
+    try {
+      const checkResult = await verifyTotp({ secret, token: code })
+      isValid = Boolean(checkResult?.valid)
+    } catch {
+      isValid = false
+    }
+
+    if (!isValid) {
+      throw createError('Incorrect 6-digit authenticator code. Please check your authenticator app and try again.', 400)
     }
 
     const updatedUser = await prisma.user.update({
@@ -424,8 +438,14 @@ router.post('/2fa/disable', authenticate, validateBody(disable2FASchema), async 
       const valid = await bcrypt.compare(password, user.passwordHash)
       if (!valid) throw createError('Current account password is incorrect', 400)
     } else if (code && user.twoFactorSecret) {
-      const checkResult = await verifyTotp({ secret: user.twoFactorSecret, token: code })
-      if (!checkResult.valid) throw createError('Invalid 6-digit authenticator code', 400)
+      let isValid = false
+      try {
+        const checkResult = await verifyTotp({ secret: user.twoFactorSecret, token: code })
+        isValid = Boolean(checkResult?.valid)
+      } catch {
+        isValid = false
+      }
+      if (!isValid) throw createError('Incorrect 6-digit authenticator code', 400)
     } else {
       throw createError('Verification failed', 400)
     }

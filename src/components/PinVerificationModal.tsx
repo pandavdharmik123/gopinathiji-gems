@@ -81,7 +81,13 @@ export default function PinVerificationModal({
       onSuccess()
       onClose()
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : t('pin.invalid_pin')
+      const msg =
+        err instanceof ApiError &&
+        err.message &&
+        err.message !== 'Internal server error' &&
+        err.message !== 'Request failed'
+          ? err.message
+          : t('pin.invalid_pin')
       setErrorMsg(msg)
       setPin('')
     } finally {
