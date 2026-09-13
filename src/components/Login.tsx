@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Form, Input, Modal, Space, Tag, Typography, message } from 'antd'
+import { Alert, Button, Card, Form, Input, Space, Tag, Typography, message } from 'antd'
 import {
   Lock,
   UserRound,
@@ -24,7 +24,7 @@ interface LoginProps {
 export default function Login({ onLogin }: LoginProps) {
   const { t } = useApp()
   const [step, setStep] = useState<'credentials' | '2fa'>('credentials')
-  const [twoFactorMode, setTwoFactorMode] = useState<'authenticator' | 'email'>('authenticator')
+  const [twoFactorMode, setTwoFactorMode] = useState<'authenticator' | 'email' | 'choose_method'>('authenticator')
   const [tempToken, setTempToken] = useState('')
   const [hasEmail, setHasEmail] = useState(false)
   const [maskedEmail, setMaskedEmail] = useState<string | null>(null)
@@ -39,7 +39,6 @@ export default function Login({ onLogin }: LoginProps) {
   const [sendingOtp, setSendingOtp] = useState(false)
   const [otpSent, setOtpSent] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
-  const [methodModalOpen, setMethodModalOpen] = useState(false)
 
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -177,7 +176,6 @@ export default function Login({ onLogin }: LoginProps) {
   }
 
   const handleSelectMethod = (mode: 'authenticator' | 'email') => {
-    setMethodModalOpen(false)
     setError('')
     setTwoFactorMode(mode)
 
@@ -333,7 +331,10 @@ export default function Login({ onLogin }: LoginProps) {
                 <Button
                   type="link"
                   icon={<KeyRound size={15} />}
-                  onClick={() => setMethodModalOpen(true)}
+                  onClick={() => {
+                    setError('')
+                    setTwoFactorMode('choose_method')
+                  }}
                   style={{
                     fontSize: '0.86rem',
                     fontWeight: 600,
@@ -355,7 +356,7 @@ export default function Login({ onLogin }: LoginProps) {
                 </Button>
               </div>
             </div>
-          ) : (
+          ) : twoFactorMode === 'email' ? (
             /* ─── Mode 2: Email OTP ─── */
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
               <div style={{ textAlign: 'center' }}>
@@ -458,13 +459,176 @@ export default function Login({ onLogin }: LoginProps) {
               )}
 
               {/* Navigation Links */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, width: '100%', marginTop: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: '100%', marginTop: 4 }}>
+                <Button
+                  type="link"
+                  icon={<KeyRound size={15} />}
+                  onClick={() => {
+                    setError('')
+                    setTwoFactorMode('choose_method')
+                  }}
+                  style={{
+                    fontSize: '0.86rem',
+                    fontWeight: 600,
+                    color: '#0f595c',
+                    padding: 0,
+                    height: 'auto',
+                  }}
+                >
+                  {t('2fa.try_another_way')}
+                </Button>
+
+                <Button
+                  type="link"
+                  icon={<ArrowLeft size={14} />}
+                  onClick={handleBackToLogin}
+                  style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', padding: 0, height: 'auto', marginTop: 4 }}
+                >
+                  {t('2fa.back_to_login')}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* ─── Mode 3: Choose Verification Method (in-card) ─── */
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #0f595c 0%, #158084 100%)',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 12px',
+                    boxShadow: '0 6px 16px rgba(15, 89, 92, 0.25)',
+                  }}
+                >
+                  <KeyRound size={26} />
+                </div>
+
+                <Typography.Title level={4} style={{ margin: 0, fontWeight: 800 }}>
+                  {t('2fa.choose_method_title')}
+                </Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: '0.82rem', marginTop: 4, display: 'block' }}>
+                  {t('2fa.choose_method_desc')}
+                </Typography.Text>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', marginTop: 4 }}>
+                {/* Method 1: Authenticator App */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleSelectMethod('authenticator')}
+                  onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleSelectMethod('authenticator')}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: 12,
+                    border: '1.5px solid #0f595c',
+                    background: '#f0fdf4',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 2px 8px rgba(15, 89, 92, 0.08)',
+                    userSelect: 'none',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div
+                      style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 10,
+                        background: '#e6fffa',
+                        color: '#0f595c',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Smartphone size={22} />
+                    </div>
+                    <div>
+                      <Typography.Text strong style={{ display: 'block', fontSize: '0.92rem', color: '#0f595c' }}>
+                        {t('2fa.method_authenticator')}
+                      </Typography.Text>
+                      <Typography.Text type="secondary" style={{ fontSize: '0.78rem', lineHeight: 1.3, display: 'block' }}>
+                        {t('2fa.method_authenticator_desc')}
+                      </Typography.Text>
+                    </div>
+                  </div>
+                  <CheckCircle2 size={18} color="#0f595c" style={{ flexShrink: 0, marginLeft: 8 }} />
+                </div>
+
+                {/* Method 2: Email OTP */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleSelectMethod('email')}
+                  onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleSelectMethod('email')}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: 12,
+                    border: '1px solid #e2e8f0',
+                    background: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
+                    userSelect: 'none',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div
+                      style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 10,
+                        background: '#e0f2fe',
+                        color: '#0284c7',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Mail size={22} />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Typography.Text strong style={{ display: 'block', fontSize: '0.92rem' }}>
+                          {t('2fa.method_email')}
+                        </Typography.Text>
+                        {maskedEmail && (
+                          <Tag color="cyan" style={{ fontSize: '0.72rem', borderRadius: 8, padding: '0 6px', margin: 0 }}>
+                            {maskedEmail}
+                          </Tag>
+                        )}
+                      </div>
+                      <Typography.Text type="secondary" style={{ fontSize: '0.78rem', lineHeight: 1.3, display: 'block', marginTop: 2 }}>
+                        {hasEmail ? t('2fa.method_email_desc') : t('2fa.no_email_configured')}
+                      </Typography.Text>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Navigation Back */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: '100%', marginTop: 4 }}>
                 <Button
                   type="link"
                   icon={<Smartphone size={15} />}
                   onClick={() => {
-                    setTwoFactorMode('authenticator')
                     setError('')
+                    setTwoFactorMode('authenticator')
                   }}
                   style={{
                     fontSize: '0.84rem',
@@ -481,7 +645,7 @@ export default function Login({ onLogin }: LoginProps) {
                   type="link"
                   icon={<ArrowLeft size={14} />}
                   onClick={handleBackToLogin}
-                  style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', padding: 0, height: 'auto' }}
+                  style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', padding: 0, height: 'auto', marginTop: 4 }}
                 >
                   {t('2fa.back_to_login')}
                 </Button>
@@ -490,119 +654,6 @@ export default function Login({ onLogin }: LoginProps) {
           )}
         </Space>
       </Card>
-
-      {/* ─── 'Try Another Way' Verification Method Modal ─── */}
-      <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <KeyRound size={20} color="#0f595c" />
-            <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>{t('2fa.choose_method_title')}</span>
-          </div>
-        }
-        open={methodModalOpen}
-        onCancel={() => setMethodModalOpen(false)}
-        footer={null}
-        centered
-        width={440}
-        styles={{ body: { paddingTop: 14 } }}
-      >
-        <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 18, fontSize: '0.84rem' }}>
-          {t('2fa.choose_method_desc')}
-        </Typography.Text>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Method 1: Authenticator App */}
-          <div
-            onClick={() => handleSelectMethod('authenticator')}
-            style={{
-              padding: '14px 16px',
-              borderRadius: 12,
-              border: twoFactorMode === 'authenticator' ? '2px solid #0f595c' : '1px solid #e2e8f0',
-              background: twoFactorMode === 'authenticator' ? '#f0fdf4' : '#ffffff',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: '#e6fffa',
-                  color: '#0f595c',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Smartphone size={20} />
-              </div>
-              <div>
-                <Typography.Text strong style={{ display: 'block', fontSize: '0.9rem' }}>
-                  {t('2fa.method_authenticator')}
-                </Typography.Text>
-                <Typography.Text type="secondary" style={{ fontSize: '0.78rem' }}>
-                  {t('2fa.method_authenticator_desc')}
-                </Typography.Text>
-              </div>
-            </div>
-            {twoFactorMode === 'authenticator' && <CheckCircle2 size={18} color="#0f595c" />}
-          </div>
-
-          {/* Method 2: Email OTP */}
-          <div
-            onClick={() => handleSelectMethod('email')}
-            style={{
-              padding: '14px 16px',
-              borderRadius: 12,
-              border: twoFactorMode === 'email' ? '2px solid #0284c7' : '1px solid #e2e8f0',
-              background: twoFactorMode === 'email' ? '#f0f9ff' : '#ffffff',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: '#e0f2fe',
-                  color: '#0284c7',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Mail size={20} />
-              </div>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Typography.Text strong style={{ fontSize: '0.9rem' }}>
-                    {t('2fa.method_email')}
-                  </Typography.Text>
-                  {maskedEmail && (
-                    <Tag color="cyan" style={{ fontSize: '0.7rem', borderRadius: 8, padding: '0 6px' }}>
-                      {maskedEmail}
-                    </Tag>
-                  )}
-                </div>
-                <Typography.Text type="secondary" style={{ fontSize: '0.78rem' }}>
-                  {hasEmail ? t('2fa.method_email_desc') : t('2fa.no_email_configured')}
-                </Typography.Text>
-              </div>
-            </div>
-            {twoFactorMode === 'email' && <CheckCircle2 size={18} color="#0284c7" />}
-          </div>
-        </div>
-      </Modal>
     </div>
   )
 }
