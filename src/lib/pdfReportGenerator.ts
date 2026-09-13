@@ -1,5 +1,6 @@
 import type { CompanySettings, AccountingYear, Transaction, Party, User } from '../types'
 import { formatCurrency } from '../data/mockData'
+import logoTwo from '../assets/logoTwo.png'
 
 export interface ReportKPICard {
   label: string
@@ -305,7 +306,7 @@ export function printPDFReport(options: PDFReportOptions) {
       <tr>
         <td style="width: 60%; vertical-align: top;">
           <div style="display: flex; align-items: center; gap: 12px;">
-            <img src="/logoOne.png" alt="Logo" style="width: 48px; height: 48px; object-fit: contain;" onerror="this.src='/logoTwo.png'; this.onerror=null;" />
+            <img src="${logoTwo}" alt="Gopinathji Gems Logo" style="height: 50px; width: auto; object-fit: contain; flex-shrink: 0;" />
             <div>
               <h1 style="margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; letter-spacing: -0.01em; text-transform: uppercase;">
                 ${escapeHtml(companyName)}

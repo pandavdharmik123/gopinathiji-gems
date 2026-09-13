@@ -324,9 +324,21 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
               </div>
 
               <div>
-                <Typography.Text strong style={{ display: 'block', marginBottom: 6, fontSize: '0.85rem' }}>
-                  {t('profile.email')}
-                </Typography.Text>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Typography.Text strong style={{ fontSize: '0.85rem' }}>
+                    {t('profile.email')}
+                  </Typography.Text>
+                  {currentUser.email ? (
+                    <Tag color="success" style={{ borderRadius: 10, fontSize: '0.72rem', fontWeight: 600 }}>
+                      <Check size={11} style={{ marginRight: 3, verticalAlign: 'middle' }} />
+                      {t('profile.email_otp_badge')}
+                    </Tag>
+                  ) : (
+                    <Tag color="warning" style={{ borderRadius: 10, fontSize: '0.72rem', fontWeight: 600 }}>
+                      {t('profile.email_otp_missing')}
+                    </Tag>
+                  )}
+                </div>
                 <Input
                   prefix={<Mail size={15} color="var(--muted-foreground)" />}
                   type="email"
@@ -335,6 +347,9 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
                   placeholder="name@company.com"
                   style={{ height: 40, borderRadius: 8 }}
                 />
+                <Typography.Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: '0.76rem', color: '#64748b' }}>
+                  {t('profile.email_otp_hint')}
+                </Typography.Text>
               </div>
 
               <Row gutter={[12, 12]}>
@@ -616,6 +631,17 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
               <Typography.Text type="secondary" style={{ fontSize: '0.8rem', display: 'block', marginTop: 2 }}>
                 {t('2fa.desc')}
               </Typography.Text>
+              {currentUser.twoFactorEnabled && (
+                <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem' }}>
+                  <Mail size={13} color="var(--primary)" />
+                  <span style={{ color: '#475569' }}>
+                    {isGu ? 'બેકઅપ ઇમેઇલ OTP:' : 'Backup Email OTP:'}{' '}
+                    <strong style={{ color: currentUser.email ? '#0f595c' : '#dc2626' }}>
+                      {currentUser.email || (isGu ? 'સેટ નથી (ઉપર પ્રોફાઇલમાં ઇમેઇલ ઉમેરો)' : 'Not set (Add email above)')}
+                    </strong>
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

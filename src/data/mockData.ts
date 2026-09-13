@@ -53,7 +53,7 @@ export const SEED_AUDIT_LOGS: AuditLog[] = [
 ]
 
 export const DEFAULT_SETTINGS: CompanySettings = {
-  name: 'Jikadara & Pandav Associates',
+  name: 'Gopinathji Gems',
   gst: '24AABCJ1234R1Z5',
   address: 'ઓફ. 201, બિઝ઼ ઝોન, સુરત - 395001, ગુજરાત',
   phone: '+91 98765 43210',

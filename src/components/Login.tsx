@@ -1,9 +1,21 @@
-import { Alert, Button, Card, Form, Input, Space, Typography } from 'antd'
-import { Lock, UserRound, Smartphone, ShieldCheck, ArrowLeft } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { Alert, Button, Card, Form, Input, Modal, Space, Tag, Typography, message } from 'antd'
+import {
+  Lock,
+  UserRound,
+  Smartphone,
+  ShieldCheck,
+  ArrowLeft,
+  Mail,
+  KeyRound,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle2,
+} from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
 import type { User } from '../types'
 import { api, ApiError } from '../lib/api'
 import { useApp } from '../store/AppContext'
+import logoOne from '../assets/logoOne.png'
 
 interface LoginProps {
   onLogin: (user: User) => void | Promise<void>
@@ -12,11 +24,38 @@ interface LoginProps {
 export default function Login({ onLogin }: LoginProps) {
   const { t } = useApp()
   const [step, setStep] = useState<'credentials' | '2fa'>('credentials')
+  const [twoFactorMode, setTwoFactorMode] = useState<'authenticator' | 'email'>('authenticator')
   const [tempToken, setTempToken] = useState('')
+  const [hasEmail, setHasEmail] = useState(false)
+  const [maskedEmail, setMaskedEmail] = useState<string | null>(null)
+
+  // Code states
   const [twoFactorCode, setTwoFactorCode] = useState('')
+  const [emailCode, setEmailCode] = useState('')
+
+  // UI & Loading states
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sendingOtp, setSendingOtp] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [methodModalOpen, setMethodModalOpen] = useState(false)
 
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Resend cooldown timer cleanup
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      timerRef.current = setTimeout(() => {
+        setResendCooldown(prev => prev - 1)
+      }, 1000)
+    }
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [resendCooldown])
+
+  // Focus input when step or mode changes
   useEffect(() => {
     if (step === '2fa') {
       const timer = window.setTimeout(() => {
@@ -27,7 +66,7 @@ export default function Login({ onLogin }: LoginProps) {
       }, 150)
       return () => window.clearTimeout(timer)
     }
-  }, [step])
+  }, [step, twoFactorMode])
 
   const handleCredentialsSubmit = async (values: { username: string; password: string }) => {
     setLoading(true)
@@ -36,9 +75,15 @@ export default function Login({ onLogin }: LoginProps) {
       const res = await api.login(values.username, values.password)
       if (res.require2FA && res.tempToken) {
         setTempToken(res.tempToken)
-        setStep('2fa')
+        setHasEmail(Boolean(res.hasEmail))
+        setMaskedEmail(res.maskedEmail || null)
+        setTwoFactorMode('authenticator')
         setTwoFactorCode('')
-      } else if (res.user) {
+        setEmailCode('')
+        setOtpSent(false)
+        setResendCooldown(0)
+        setStep('2fa')
+      } else if (!res.require2FA && res.user) {
         await onLogin(res.user)
       }
     } catch (err) {
@@ -49,6 +94,7 @@ export default function Login({ onLogin }: LoginProps) {
     }
   }
 
+  // Submit Authenticator App Code
   const handle2FASubmit = async (codeToVerify?: string) => {
     const code = codeToVerify ?? twoFactorCode
     if (!code || code.length < 6) {
@@ -76,11 +122,84 @@ export default function Login({ onLogin }: LoginProps) {
     }
   }
 
+  // Request Email OTP
+  const handleSendEmailOTP = async () => {
+    if (!tempToken) return
+    if (!hasEmail) {
+      setError(t('2fa.no_email_configured'))
+      return
+    }
+
+    setSendingOtp(true)
+    setError('')
+    try {
+      const res = await api.sendLoginEmailOTP(tempToken)
+      setOtpSent(true)
+      setResendCooldown(60)
+      if (res.maskedEmail) {
+        setMaskedEmail(res.maskedEmail)
+      }
+      message.success(t('2fa.otp_sent_success'))
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'Failed to send verification email'
+      setError(msg)
+    } finally {
+      setSendingOtp(false)
+    }
+  }
+
+  // Submit Email OTP Code
+  const handleEmailOTPSubmit = async (codeToVerify?: string) => {
+    const code = codeToVerify ?? emailCode
+    if (!code || code.length < 6) {
+      setError(t('2fa.invalid_code'))
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    try {
+      const user = await api.verifyLoginEmailOTP(tempToken, code)
+      await onLogin(user)
+    } catch (err) {
+      const msg =
+        err instanceof ApiError &&
+        err.message &&
+        err.message !== 'Internal server error' &&
+        err.message !== 'Request failed'
+          ? err.message
+          : t('2fa.invalid_code')
+      setError(msg)
+      setEmailCode('')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSelectMethod = (mode: 'authenticator' | 'email') => {
+    setMethodModalOpen(false)
+    setError('')
+    setTwoFactorMode(mode)
+
+    if (mode === 'email') {
+      setEmailCode('')
+      if (!otpSent && resendCooldown === 0) {
+        void handleSendEmailOTP()
+      }
+    } else {
+      setTwoFactorCode('')
+    }
+  }
+
   const handleBackToLogin = () => {
     setStep('credentials')
+    setTwoFactorMode('authenticator')
     setTempToken('')
     setTwoFactorCode('')
+    setEmailCode('')
     setError('')
+    setOtpSent(false)
+    setResendCooldown(0)
   }
 
   return (
@@ -89,7 +208,7 @@ export default function Login({ onLogin }: LoginProps) {
         <Space direction="vertical" size={24} style={{ width: '100%' }}>
           <div style={{ textAlign: 'center', marginBottom: 8 }}>
             <img
-              src="/logoOne.png"
+              src={logoOne}
               alt="Gopinathji Gems Logo"
               style={{ width: 190, height: 110, objectFit: 'contain', display: 'inline-block' }}
             />
@@ -143,7 +262,8 @@ export default function Login({ onLogin }: LoginProps) {
                 {t('login.button')}
               </Button>
             </Form>
-          ) : (
+          ) : twoFactorMode === 'authenticator' ? (
+            /* ─── Mode 1: Authenticator App ─── */
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
               <div style={{ textAlign: 'center' }}>
                 <div
@@ -208,18 +328,281 @@ export default function Login({ onLogin }: LoginProps) {
                 {t('2fa.login_btn')}
               </Button>
 
-              <Button
-                type="link"
-                icon={<ArrowLeft size={14} />}
-                onClick={handleBackToLogin}
-                style={{ fontSize: '0.84rem', color: 'var(--muted-foreground)' }}
-              >
-                {t('2fa.back_to_login')}
-              </Button>
+              {/* Try Another Way Option */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: '100%', marginTop: 4 }}>
+                <Button
+                  type="link"
+                  icon={<KeyRound size={15} />}
+                  onClick={() => setMethodModalOpen(true)}
+                  style={{
+                    fontSize: '0.86rem',
+                    fontWeight: 600,
+                    color: '#0f595c',
+                    padding: 0,
+                    height: 'auto',
+                  }}
+                >
+                  {t('2fa.try_another_way')}
+                </Button>
+
+                <Button
+                  type="link"
+                  icon={<ArrowLeft size={14} />}
+                  onClick={handleBackToLogin}
+                  style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', padding: 0, height: 'auto', marginTop: 4 }}
+                >
+                  {t('2fa.back_to_login')}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* ─── Mode 2: Email OTP ─── */
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 12px',
+                    boxShadow: '0 6px 16px rgba(2, 132, 199, 0.25)',
+                  }}
+                >
+                  <Mail size={26} />
+                </div>
+
+                <Typography.Title level={4} style={{ margin: 0, fontWeight: 800 }}>
+                  {t('2fa.email_login_title')}
+                </Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: '0.82rem', marginTop: 4, display: 'block' }}>
+                  {t('2fa.email_login_desc')}
+                </Typography.Text>
+                {maskedEmail && (
+                  <Tag color="cyan" style={{ marginTop: 6, padding: '2px 10px', borderRadius: 12, fontWeight: 600, fontSize: '0.82rem' }}>
+                    {maskedEmail}
+                  </Tag>
+                )}
+              </div>
+
+              {!hasEmail ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  icon={<AlertCircle size={16} />}
+                  message={t('2fa.no_email_configured')}
+                  style={{ borderRadius: 8, fontSize: '0.82rem' }}
+                />
+              ) : (
+                <>
+                  <div className="login-2fa-input" style={{ width: '100%', display: 'flex', justifyContent: 'center', margin: '6px 0' }}>
+                    <Input.OTP
+                      autoFocus
+                      length={6}
+                      size="large"
+                      value={emailCode}
+                      onChange={val => {
+                        setEmailCode(val)
+                        setError('')
+                        if (val.length === 6) {
+                          void handleEmailOTPSubmit(val)
+                        }
+                      }}
+                      style={{ gap: 8 }}
+                    />
+                  </div>
+
+                  <Button
+                    type="primary"
+                    icon={<ShieldCheck size={16} />}
+                    loading={loading}
+                    disabled={emailCode.length < 6}
+                    onClick={() => handleEmailOTPSubmit()}
+                    block
+                    size="large"
+                    style={{
+                      height: 44,
+                      fontWeight: 600,
+                      fontSize: '0.95rem',
+                      background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                      borderColor: '#0284c7',
+                      boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+                    }}
+                  >
+                    {t('2fa.login_btn')}
+                  </Button>
+
+                  {/* Resend OTP button with cooldown */}
+                  <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                    {resendCooldown > 0 ? (
+                      <Typography.Text type="secondary" style={{ fontSize: '0.82rem' }}>
+                        {t('2fa.resend_in').replace('{sec}', String(resendCooldown))}
+                      </Typography.Text>
+                    ) : (
+                      <Button
+                        type="link"
+                        icon={<RefreshCw size={14} className={sendingOtp ? 'animate-spin' : ''} />}
+                        loading={sendingOtp}
+                        onClick={() => handleSendEmailOTP()}
+                        style={{ fontSize: '0.82rem', color: '#0284c7', padding: 0, height: 'auto' }}
+                      >
+                        {t('2fa.resend_otp_btn')}
+                      </Button>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Navigation Links */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, width: '100%', marginTop: 6 }}>
+                <Button
+                  type="link"
+                  icon={<Smartphone size={15} />}
+                  onClick={() => {
+                    setTwoFactorMode('authenticator')
+                    setError('')
+                  }}
+                  style={{
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    color: '#0f595c',
+                    padding: 0,
+                    height: 'auto',
+                  }}
+                >
+                  {t('2fa.switch_to_authenticator')}
+                </Button>
+
+                <Button
+                  type="link"
+                  icon={<ArrowLeft size={14} />}
+                  onClick={handleBackToLogin}
+                  style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', padding: 0, height: 'auto' }}
+                >
+                  {t('2fa.back_to_login')}
+                </Button>
+              </div>
             </div>
           )}
         </Space>
       </Card>
+
+      {/* ─── 'Try Another Way' Verification Method Modal ─── */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <KeyRound size={20} color="#0f595c" />
+            <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>{t('2fa.choose_method_title')}</span>
+          </div>
+        }
+        open={methodModalOpen}
+        onCancel={() => setMethodModalOpen(false)}
+        footer={null}
+        centered
+        width={440}
+        styles={{ body: { paddingTop: 14 } }}
+      >
+        <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 18, fontSize: '0.84rem' }}>
+          {t('2fa.choose_method_desc')}
+        </Typography.Text>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Method 1: Authenticator App */}
+          <div
+            onClick={() => handleSelectMethod('authenticator')}
+            style={{
+              padding: '14px 16px',
+              borderRadius: 12,
+              border: twoFactorMode === 'authenticator' ? '2px solid #0f595c' : '1px solid #e2e8f0',
+              background: twoFactorMode === 'authenticator' ? '#f0fdf4' : '#ffffff',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  background: '#e6fffa',
+                  color: '#0f595c',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Smartphone size={20} />
+              </div>
+              <div>
+                <Typography.Text strong style={{ display: 'block', fontSize: '0.9rem' }}>
+                  {t('2fa.method_authenticator')}
+                </Typography.Text>
+                <Typography.Text type="secondary" style={{ fontSize: '0.78rem' }}>
+                  {t('2fa.method_authenticator_desc')}
+                </Typography.Text>
+              </div>
+            </div>
+            {twoFactorMode === 'authenticator' && <CheckCircle2 size={18} color="#0f595c" />}
+          </div>
+
+          {/* Method 2: Email OTP */}
+          <div
+            onClick={() => handleSelectMethod('email')}
+            style={{
+              padding: '14px 16px',
+              borderRadius: 12,
+              border: twoFactorMode === 'email' ? '2px solid #0284c7' : '1px solid #e2e8f0',
+              background: twoFactorMode === 'email' ? '#f0f9ff' : '#ffffff',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  background: '#e0f2fe',
+                  color: '#0284c7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Mail size={20} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Typography.Text strong style={{ fontSize: '0.9rem' }}>
+                    {t('2fa.method_email')}
+                  </Typography.Text>
+                  {maskedEmail && (
+                    <Tag color="cyan" style={{ fontSize: '0.7rem', borderRadius: 8, padding: '0 6px' }}>
+                      {maskedEmail}
+                    </Tag>
+                  )}
+                </div>
+                <Typography.Text type="secondary" style={{ fontSize: '0.78rem' }}>
+                  {hasEmail ? t('2fa.method_email_desc') : t('2fa.no_email_configured')}
+                </Typography.Text>
+              </div>
+            </div>
+            {twoFactorMode === 'email' && <CheckCircle2 size={18} color="#0284c7" />}
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

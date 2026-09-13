@@ -12,6 +12,8 @@ interface ApiEnvelope<T> {
   message?: string
   require2FA?: boolean
   tempToken?: string
+  hasEmail?: boolean
+  maskedEmail?: string | null
   secret?: string
   qrCodeUrl?: string
   otpauthUrl?: string
@@ -19,7 +21,7 @@ interface ApiEnvelope<T> {
 
 export type LoginResult =
   | { require2FA: false; user: User }
-  | { require2FA: true; tempToken: string; user?: Partial<User> }
+  | { require2FA: true; tempToken: string; hasEmail?: boolean; maskedEmail?: string | null; user?: Partial<User> }
 
 export class ApiError extends Error {
   status: number
@@ -241,6 +243,8 @@ export const api = {
       return {
         require2FA: true,
         tempToken: envelope.tempToken,
+        hasEmail: envelope.hasEmail,
+        maskedEmail: envelope.maskedEmail,
         user: envelope.user ? normalizeUser(envelope.user) : undefined,
       }
     }
@@ -254,6 +258,23 @@ export const api = {
 
   async login2FA(tempToken: string, code: string): Promise<User> {
     const envelope = await request<ApiEnvelope<never>>('/auth/login/2fa', {
+      method: 'POST',
+      body: JSON.stringify({ tempToken, code }),
+    })
+    if (!envelope.token || !envelope.user) throw new ApiError('Invalid login response', 500)
+    setToken(envelope.token)
+    return normalizeUser(envelope.user)
+  },
+
+  async sendLoginEmailOTP(tempToken: string): Promise<{ success: boolean; message?: string; maskedEmail?: string }> {
+    return request('/auth/login/2fa/send-email-otp', {
+      method: 'POST',
+      body: JSON.stringify({ tempToken }),
+    })
+  },
+
+  async verifyLoginEmailOTP(tempToken: string, code: string): Promise<User> {
+    const envelope = await request<ApiEnvelope<never>>('/auth/login/2fa/verify-email-otp', {
       method: 'POST',
       body: JSON.stringify({ tempToken, code }),
     })

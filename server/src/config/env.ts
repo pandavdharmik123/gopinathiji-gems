@@ -13,6 +13,12 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('2h'),
   CORS_ORIGIN: z.string().default('http://localhost:8443'),
   BCRYPT_ROUNDS: z.coerce.number().default(12),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional().default(587),
+  SMTP_SECURE: z.preprocess(v => v === 'true' || v === true, z.boolean().default(false)),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional().default('Gopinathji Gems <no-reply@gopinathjigems.com>'),
 })
 
 const parsed = envSchema.safeParse(process.env)

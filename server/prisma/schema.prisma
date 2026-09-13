@@ -64,6 +64,8 @@ model User {
   pinHash          String?
   twoFactorSecret  String?
   twoFactorEnabled Boolean    @default(false)
+  emailOtpHash      String?
+  emailOtpExpiresAt DateTime?
   role             UserRole   @default(employee)
   email            String     @unique
   status           UserStatus @default(active)
@@ -171,7 +173,7 @@ model Notification {
 
 model CompanySettings {
   id         String   @id @default("singleton")
-  name       String   @default("Jikadara & Pandav Associates")
+  name       String   @default("Gopinathji Gems")
   gst        String   @default("")
   address    String   @default("")
   phone      String   @default("")

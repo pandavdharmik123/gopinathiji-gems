@@ -10,8 +10,12 @@ import { authenticate } from '../middleware/auth'
 import { validateBody } from '../middleware/validate'
 import { createAuditLog } from '../services/audit'
 import { createError } from '../middleware/errorHandler'
+import { sendOtpEmail, maskEmail } from '../services/emailService'
 
 const router = Router()
+
+// In-memory cooldown tracker (userId -> timestamp ms) for OTP resends
+const otpCooldowns = new Map<string, number>()
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 const loginSchema = z.object({
@@ -20,6 +24,15 @@ const loginSchema = z.object({
 })
 
 const login2FASchema = z.object({
+  tempToken: z.string().min(1),
+  code: z.string().min(6).max(6),
+})
+
+const sendEmailOTPSchema = z.object({
+  tempToken: z.string().min(1),
+})
+
+const verifyEmailOTPSchema = z.object({
   tempToken: z.string().min(1),
   code: z.string().min(6).max(6),
 })
@@ -81,11 +94,14 @@ router.post('/login', validateBody(loginSchema), async (req: Request, res: Respo
     // If Two-Factor Authentication is enabled, return 2FA pending response with short-lived temp token
     if (user.twoFactorEnabled && user.twoFactorSecret) {
       const tempPayload = { userId: user.id, is2faPending: true }
-      const tempToken = jwt.sign(tempPayload, env.JWT_SECRET, { expiresIn: '5m' })
+      const tempToken = jwt.sign(tempPayload, env.JWT_SECRET, { expiresIn: '10m' })
+      const hasEmail = Boolean(user.email && user.email.trim() && user.email.includes('@'))
       return res.json({
         success: true,
         require2FA: true,
         tempToken,
+        hasEmail,
+        maskedEmail: hasEmail ? maskEmail(user.email) : null,
         user: {
           username: user.username,
           name: user.name,
@@ -171,6 +187,146 @@ router.post('/login/2fa', validateBody(login2FASchema), async (req: Request, res
   }
 })
 
+// ─── POST /api/auth/login/2fa/send-email-otp ──────────────────────────────────
+router.post('/login/2fa/send-email-otp', validateBody(sendEmailOTPSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tempToken } = req.body as z.infer<typeof sendEmailOTPSchema>
+    let payload: any
+    try {
+      payload = jwt.verify(tempToken, env.JWT_SECRET)
+    } catch {
+      throw createError('Verification session expired. Please login again.', 401)
+    }
+
+    if (!payload || !payload.userId || !payload.is2faPending) {
+      throw createError('Invalid verification session token', 401)
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: payload.userId } })
+    if (!user || user.status === 'inactive') {
+      throw createError('User not found or inactive', 400)
+    }
+
+    if (!user.email || !user.email.trim() || !user.email.includes('@')) {
+      throw createError('No email address is configured in your profile settings. Please use your Authenticator app or contact your administrator.', 400)
+    }
+
+    // Anti-spam cooldown check (60 seconds)
+    const now = Date.now()
+    const lastSent = otpCooldowns.get(user.id)
+    if (lastSent && now - lastSent < 60 * 1000) {
+      const remainingSeconds = Math.ceil((60 * 1000 - (now - lastSent)) / 1000)
+      throw createError(`Please wait ${remainingSeconds} seconds before requesting a new code.`, 429)
+    }
+
+    // Generate secure 6-digit numeric OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString()
+    const salt = await bcrypt.genSalt(10)
+    const emailOtpHash = await bcrypt.hash(otp, salt)
+    const emailOtpExpiresAt = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailOtpHash,
+        emailOtpExpiresAt,
+      },
+    })
+
+    otpCooldowns.set(user.id, now)
+
+    await sendOtpEmail({
+      to: user.email,
+      name: user.name,
+      otp,
+    })
+
+    res.json({
+      success: true,
+      message: 'Verification code sent to your email successfully',
+      maskedEmail: maskEmail(user.email),
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── POST /api/auth/login/2fa/verify-email-otp ────────────────────────────────
+router.post('/login/2fa/verify-email-otp', validateBody(verifyEmailOTPSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tempToken, code } = req.body as z.infer<typeof verifyEmailOTPSchema>
+    let payload: any
+    try {
+      payload = jwt.verify(tempToken, env.JWT_SECRET)
+    } catch {
+      throw createError('Verification session expired. Please login again.', 401)
+    }
+
+    if (!payload || !payload.userId || !payload.is2faPending) {
+      throw createError('Invalid verification session token', 401)
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: payload.userId } })
+    if (!user || user.status === 'inactive') {
+      throw createError('Invalid verification request', 400)
+    }
+
+    if (!user.emailOtpHash || !user.emailOtpExpiresAt) {
+      throw createError('No OTP request found. Please request a new verification code.', 400)
+    }
+
+    if (new Date() > user.emailOtpExpiresAt) {
+      throw createError('The verification code has expired. Please request a new code.', 400)
+    }
+
+    const isValid = await bcrypt.compare(code, user.emailOtpHash)
+    if (!isValid) {
+      throw createError('Incorrect 6-digit email verification code. Please check your email and try again.', 400)
+    }
+
+    // Clear OTP hash and expiration upon successful verification
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailOtpHash: null,
+        emailOtpExpiresAt: null,
+      },
+    })
+
+    otpCooldowns.delete(user.id)
+
+    void createAuditLog({
+      userId: user.id,
+      userName: user.username,
+      action: 'ઇમેઇલ OTP થી લૉગિન',
+      entity: 'સુરક્ષા',
+      details: `${user.name} (${user.username}) — Login via Email OTP backup`,
+      entityId: user.id,
+    })
+
+    const authPayload = { userId: user.id, username: user.username, role: user.role }
+    const token = jwt.sign(authPayload, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] })
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        role: user.role,
+        email: user.email,
+        status: user.status,
+        hasPin: !!user.pinHash,
+        twoFactorEnabled: !!user.twoFactorEnabled,
+        createdAt: user.createdAt,
+      },
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
 // ─── GET /api/auth/me ─────────────────────────────────────────────────────────
 router.get('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -191,11 +347,24 @@ router.put('/profile', authenticate, validateBody(updateProfileSchema), async (r
   try {
     const { name, email } = req.body as z.infer<typeof updateProfileSchema>
 
+    if (email) {
+      const normalizedEmail = email.trim().toLowerCase()
+      const existing = await prisma.user.findFirst({
+        where: {
+          email: normalizedEmail,
+          id: { not: req.user!.userId },
+        },
+      })
+      if (existing) {
+        throw createError('This email is already in use by another account', 400)
+      }
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: req.user!.userId },
       data: {
-        ...(name ? { name } : {}),
-        ...(email ? { email } : {}),
+        ...(name ? { name: name.trim() } : {}),
+        ...(email ? { email: email.trim().toLowerCase() } : {}),
       },
       select: { id: true, name: true, username: true, role: true, email: true, status: true, pinHash: true, twoFactorEnabled: true, createdAt: true },
     })

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Typography } from 'antd'
 import { useApp } from '../store/AppContext'
+import logoTwo from '../assets/logoTwo.png'
 
 // Eagerly preload logoTwo.png in module scope so browser decodes it instantly
 if (typeof window !== 'undefined') {
   const preloadImg = new Image()
-  preloadImg.src = '/logoTwo.png'
+  preloadImg.src = logoTwo
 }
 
 interface LoadingScreenProps {
@@ -21,7 +22,7 @@ export default function LoadingScreen({ fullScreen = false, message, size = 120 
   const [loaded, setLoaded] = useState(() => {
     if (typeof window !== 'undefined') {
       const img = new Image()
-      img.src = '/logoTwo.png'
+      img.src = logoTwo
       return img.complete
     }
     return false
@@ -30,7 +31,7 @@ export default function LoadingScreen({ fullScreen = false, message, size = 120 
   useEffect(() => {
     if (loaded) return
     const img = new Image()
-    img.src = '/logoTwo.png'
+    img.src = logoTwo
     if (img.complete) {
       setLoaded(true)
     } else {
@@ -68,7 +69,7 @@ export default function LoadingScreen({ fullScreen = false, message, size = 120 
 
         {/* Logo with smooth pulse animation */}
         <img
-          src="/logoTwo.png"
+          src={logoTwo}
           alt="Gopinathji Gems Loading"
           onLoad={() => setLoaded(true)}
           style={{

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import type { User } from '../types'
 import { useApp } from '../store/AppContext'
+import logoTwo from '../assets/logoTwo.png'
 
 export type Page = 'dashboard' | 'income' | 'expense' | 'transactions' | 'cashbook' | 'parties' | 'ledger' | 'reports' | 'users' | 'settings' | 'audit' | 'calendar' | 'profile'
 
@@ -57,7 +58,7 @@ function SidebarContent({ currentUser, activePage, onNavigate, onMobileClose }: 
   return (
     <div className="app-sidebar-content">
       <div className="app-brand" style={{ flexShrink: 0 }}>
-        <img src="/logoTwo.png" alt="Gopinathji Gems Logo" style={{ width: 42, height: 42, objectFit: 'contain' }} />
+        <img src={logoTwo} alt="Gopinathji Gems Logo" style={{ width: 42, height: 42, objectFit: 'contain' }} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <Typography.Text strong ellipsis style={{ display: 'block', color: '#0f595c', fontSize: '1.25rem' }}>{companyName}</Typography.Text>
           {/* <Typography.Text type="secondary" style={{ fontSize: 11 }}>{t('brand.subtitle')}</Typography.Text> */}
