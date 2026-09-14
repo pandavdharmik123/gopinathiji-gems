@@ -15,6 +15,7 @@ const MASA_MAP: Record<string, string> = {
   Shravan: 'શ્રાવણ',
   Bhadrapada: 'ભાદરવો',
   Bhadarvo: 'ભાદરવો',
+  Ashwina: 'આસો',
   Ashvina: 'આસો',
   Aso: 'આસો',
   Kartika: 'કારતક',
@@ -30,7 +31,7 @@ const MASA_MAP: Record<string, string> = {
 }
 
 const TITHI_MAP: Record<number, string> = {
-  1: 'એકમ',
+  1: 'પડવો',
   2: 'બીજ',
   3: 'ત્રીજ',
   4: 'ચોથ',
@@ -76,13 +77,18 @@ export function getGujaratiTithi(dateInput: Date | string): string {
     return ''
   }
 
-  const cacheKey = dateObj.toISOString().split('T')[0]
+  const cacheKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`
   if (dateCache.has(cacheKey)) {
     return dateCache.get(cacheKey)!
   }
 
   try {
-    const details = getPanchangamDetails(dateObj, observer)
+    // Gujarat uses the Amanta calendar system (month begins with Shukla/Sud and ends with Krishna/Vad Amavasya).
+    // IST timezone offset is +330 minutes (Ahmedabad / Gujarat).
+    const details = getPanchangamDetails(dateObj, observer, {
+      calendarType: 'amanta',
+      timezoneOffset: 330,
+    })
 
     const masaName = MASA_MAP[details.masa?.name] || details.masa?.name || ''
     const adhikaStr = details.masa?.isAdhika ? 'અધિક ' : ''
@@ -98,7 +104,11 @@ export function getGujaratiTithi(dateInput: Date | string): string {
       tithiStr = isShukla ? 'પૂનમ' : 'અમાસ'
     }
 
-    const vikramYear = details.samvat?.vikram || dateObj.getFullYear() + 57
+    // In Gujarat, Vikram Samvat is Kartikadi (New Year begins on Kartak Sud 1 / Bestu Varas).
+    // Months Chaitra (index 0) through Ashwina (index 6) fall in the previous year of the Chaitradi Samvat.
+    const chaitradiVikram = details.samvat?.vikram || (dateObj.getFullYear() + 57)
+    const masaIndex = details.masa?.index ?? 0
+    const vikramYear = masaIndex < 7 ? chaitradiVikram - 1 : chaitradiVikram
     const gujaratiYearStr = `વિક્રમ સંવત ${toGujaratiDigits(vikramYear)}`
 
     const formattedResult = `${adhikaStr}${masaName} ${pakshaStr} ${tithiStr}, ${gujaratiYearStr}`
