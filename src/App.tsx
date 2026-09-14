@@ -54,9 +54,26 @@ const ROUTE_TO_PAGE: Record<string, Page> = {
   '/profile': 'profile',
 }
 
-function getPageFromPath(pathname: string): Page {
-  const cleanPath = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname
-  return ROUTE_TO_PAGE[cleanPath] || 'dashboard'
+const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:'
+const isElectron = typeof window !== 'undefined' && (Boolean((window as any).electronAPI?.isElectron) || isFileProtocol)
+
+function getPageFromLocation(): Page {
+  if (typeof window === 'undefined') return 'dashboard'
+
+  // 1. If hash exists, check hash first (e.g. #/calendar, #calendar)
+  if (window.location.hash) {
+    const rawHash = window.location.hash.replace(/^#\/?/, '/')
+    const cleanHash = rawHash.endsWith('/') && rawHash.length > 1 ? rawHash.slice(0, -1) : rawHash
+    if (ROUTE_TO_PAGE[cleanHash]) return ROUTE_TO_PAGE[cleanHash]
+  }
+
+  // 2. If not file:// protocol, check pathname
+  if (!isFileProtocol) {
+    const cleanPath = window.location.pathname.endsWith('/') && window.location.pathname.length > 1 ? window.location.pathname.slice(0, -1) : window.location.pathname
+    if (ROUTE_TO_PAGE[cleanPath]) return ROUTE_TO_PAGE[cleanPath]
+  }
+
+  return 'dashboard'
 }
 
 export default function App() {
@@ -71,7 +88,7 @@ function AppInner() {
   const { state, refreshData, loading, dataLoaded, resetDataLoaded, error, setSelectedYearId, changeLanguage, t } = useApp()
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
-  const [activePage, setActivePageInternal] = useState<Page>(() => getPageFromPath(window.location.pathname))
+  const [activePage, setActivePageInternal] = useState<Page>(() => getPageFromLocation())
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
@@ -91,28 +108,47 @@ function AppInner() {
 
   const handleNavigate = (page: Page, replace = false) => {
     setActivePageInternal(page)
-    const targetPath = PAGE_TO_ROUTE[page] || '/dashboard'
-    if (window.location.pathname !== targetPath) {
-      if (replace) {
-        window.history.replaceState({}, '', targetPath)
-      } else {
-        window.history.pushState({}, '', targetPath)
+    const route = PAGE_TO_ROUTE[page] || '/dashboard'
+
+    if (isElectron || isFileProtocol) {
+      // In Electron / file://, keep index.html in the URL path and use hash so reloads (Ctrl+R) don't hit ERR_FILE_NOT_FOUND
+      const targetHash = '#' + route
+      if (window.location.hash !== targetHash) {
+        if (replace) {
+          window.location.replace(targetHash)
+        } else {
+          window.location.hash = targetHash
+        }
+      }
+    } else {
+      if (window.location.pathname !== route) {
+        if (replace) {
+          window.history.replaceState({}, '', route)
+        } else {
+          window.history.pushState({}, '', route)
+        }
       }
     }
   }
 
   useEffect(() => {
-    const handlePopState = () => {
-      const page = getPageFromPath(window.location.pathname)
+    const handleLocationChange = () => {
+      const page = getPageFromLocation()
       setActivePageInternal(page)
     }
-    window.addEventListener('popstate', handlePopState)
-    return () => window.removeEventListener('popstate', handlePopState)
+    window.addEventListener('popstate', handleLocationChange)
+    window.addEventListener('hashchange', handleLocationChange)
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange)
+      window.removeEventListener('hashchange', handleLocationChange)
+    }
   }, [])
 
   useEffect(() => {
-    if (window.location.pathname === '/') {
+    if (!isElectron && !isFileProtocol && window.location.pathname === '/') {
       window.history.replaceState({}, '', '/dashboard')
+    } else if ((isElectron || isFileProtocol) && !window.location.hash) {
+      window.location.replace('#/dashboard')
     }
   }, [])
 
@@ -200,7 +236,7 @@ function AppInner() {
       <Login
         onLogin={user => {
           setCurrentUser(user)
-          const currentPage = getPageFromPath(window.location.pathname)
+          const currentPage = getPageFromLocation()
           handleNavigate(currentPage, true)
         }}
       />

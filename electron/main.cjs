@@ -58,6 +58,35 @@ function createWindow() {
     return { action: 'allow' };
   });
 
+  // Gracefully recover if a URL or file path fails to load (e.g. after invalid pushState)
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (isMainFrame && errorCode !== -3) { // -3 is ERR_ABORTED
+      console.warn(`Failed to load ${validatedURL} (${errorCode}: ${errorDescription}). Recovering to index.html`);
+      if (isDev && !app.isPackaged) {
+        mainWindow.loadURL(devServerUrl);
+      } else {
+        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+      }
+    }
+  });
+
+  // Handle Ctrl+R / Cmd+R / F5 safely in desktop app so it doesn't navigate to non-existent file paths
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    const isReload =
+      (input.key.toLowerCase() === 'r' && (input.control || input.meta)) ||
+      input.key === 'F5';
+
+    if (isReload && input.type === 'keyDown') {
+      const currentURL = mainWindow.webContents.getURL() || '';
+      if (!isDev || app.isPackaged || currentURL.startsWith('file:')) {
+        event.preventDefault();
+        const hashIndex = currentURL.indexOf('#');
+        const hash = hashIndex !== -1 ? currentURL.substring(hashIndex) : '';
+        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'), { hash });
+      }
+    }
+  });
+
   if (isDev && !app.isPackaged) {
     mainWindow.loadURL(devServerUrl).catch(() => {
       // Retry loading if dev server is still starting

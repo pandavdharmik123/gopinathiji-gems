@@ -91,6 +91,24 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
 
   const [isUnlocked, setIsUnlocked] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
+  const [dismissedExpenses, setDismissedExpenses] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('dismissed_large_expenses')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
+
+  const handleDismissLargeExpense = (txnId: string) => {
+    setDismissedExpenses(prev => {
+      const updated = prev.includes(txnId) ? prev : [...prev, txnId]
+      try {
+        localStorage.setItem('dismissed_large_expenses', JSON.stringify(updated))
+      } catch {}
+      return updated
+    })
+  }
 
   const maskAmount = (val: number | string, prefix = '₹ ') => {
     if (isUnlocked) {
@@ -115,28 +133,25 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
   const yearExpense = yearTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
   const yearProfit = yearIncome - yearExpense
 
-  // Cash calculations (રોકડા)
+  // Cash & Bank balances
+  const openingCashBalance = selectedYear?.openingBalance || 0
+  const openingBankBalance = selectedYear?.openingBankBalance || 0
+
   const cashIncome = yearTxns.filter(t => t.type === 'income' && t.paymentMode === 'cash').reduce((s, t) => s + t.amount, 0)
   const cashExpense = yearTxns.filter(t => t.type === 'expense' && t.paymentMode === 'cash').reduce((s, t) => s + t.amount, 0)
   const cashProfit = cashIncome - cashExpense
-  const openingCashBalance = selectedYear ? Number(selectedYear.openingBalance || 0) : 0
-  const cashBalance = openingCashBalance + cashIncome - cashExpense
+  const cashBalance = openingCashBalance + cashProfit
 
-  // Bank calculations (બેંક)
-  const bankIncome = yearTxns.filter(t => t.type === 'income' && t.paymentMode === 'bank').reduce((s, t) => s + t.amount, 0)
-  const bankExpense = yearTxns.filter(t => t.type === 'expense' && t.paymentMode === 'bank').reduce((s, t) => s + t.amount, 0)
+  const bankIncome = yearTxns.filter(t => t.type === 'income' && (t.paymentMode === 'bank' || t.paymentMode === 'cheque' || t.paymentMode === 'upi')).reduce((s, t) => s + t.amount, 0)
+  const bankExpense = yearTxns.filter(t => t.type === 'expense' && (t.paymentMode === 'bank' || t.paymentMode === 'cheque' || t.paymentMode === 'upi')).reduce((s, t) => s + t.amount, 0)
   const bankProfit = bankIncome - bankExpense
-  const openingBankBalance = selectedYear ? Number(selectedYear.openingBankBalance || 0) : 0
-  const bankBalance = openingBankBalance + bankIncome - bankExpense
+  const bankBalance = openingBankBalance + bankProfit
 
-  // Party Receivables & Payables scoped to year
+  // Outstanding amounts
   let totalReceivable = 0
   let totalPayable = 0
   state.parties.forEach(p => {
-    const partyTxns = yearTxns.filter(t => t.partyId === p.id || t.partyName === p.name)
-    const inc = partyTxns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    const exp = partyTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-    const bal = inc - exp
+    const bal = p.balance || 0
     if (bal > 0) totalReceivable += bal
     if (bal < 0) totalPayable += Math.abs(bal)
   })
@@ -144,8 +159,10 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
   // Recent transactions scoped to the active year
   const recentTxns = [...yearTxns].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5)
 
-  // Highlight large expenses (> 20000) scoped to year
-  const largeExpenses = yearTxns.filter(t => t.type === 'expense' && t.amount > 20000).slice(0, 3)
+  // Highlight large expenses (> 20000) scoped to year, excluding dismissed ones
+  const largeExpenses = yearTxns
+    .filter(t => t.type === 'expense' && t.amount > 20000 && !dismissedExpenses.includes(t.id))
+    .slice(0, 3)
 
   const dateLocale = state.language === 'gu' ? 'gu-IN' : 'en-IN'
   const gujaratiDate = new Date().toLocaleDateString(dateLocale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -359,11 +376,19 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
       {largeExpenses.length > 0 && (
         <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
           <Col span={24}>
-            <Alert
-              type="warning"
-              showIcon
-              message={`${t('dash.large_expense_alert')} ${largeExpenses[0].description} — ${maskAmount(largeExpenses[0].amount)}`}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {largeExpenses.map(exp => (
+                <Alert
+                  key={exp.id}
+                  type="warning"
+                  showIcon
+                  closable
+                  onClose={() => handleDismissLargeExpense(exp.id)}
+                  message={`${t('dash.large_expense_alert')} ${exp.description || exp.partyName || (state.language === 'gu' ? 'ખર્ચ' : 'Expense')} — ${maskAmount(exp.amount)}`}
+                  style={{ borderRadius: 10 }}
+                />
+              ))}
+            </div>
           </Col>
         </Row>
       )}
