@@ -135,6 +135,49 @@ export async function sendOtpEmail({ to, name, otp }: SendOtpEmailOptions): Prom
     `This code will expire in 10 minutes.\n` +
     `If you did not request this code, please secure your account immediately.`
 
+  const brevoApiKey = process.env.BREVO_API_KEY || env.BREVO_API_KEY
+  if (brevoApiKey) {
+    try {
+      const cleanKey = brevoApiKey.replace(/[\s"']/g, '').trim()
+      const senderEmail = process.env.BREVO_SENDER_EMAIL || env.BREVO_SENDER_EMAIL || 'dhamopandav1311@gmail.com'
+
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': cleanKey,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: {
+            name: 'Gopinathji Gems',
+            email: senderEmail,
+          },
+          to: [
+            {
+              email: to,
+              name: name || 'User',
+            },
+          ],
+          subject: `[${otp}] Your Gopinathji Gems Login Verification Code`,
+          htmlContent: htmlContent,
+          textContent: textContent,
+        }),
+      })
+
+      if (response.ok) {
+        const resData = await response.json().catch(() => ({})) as any
+        console.log(`📧 [EMAIL SENT VIA BREVO] OTP sent successfully to ${maskEmail(to)} (MessageId: ${resData?.messageId || 'ok'})`)
+        return { success: true }
+      } else {
+        const errData = await response.json().catch(() => null)
+        console.error(`❌ [BREVO ERROR] Failed to send email via Brevo:`, errData || response.statusText)
+      }
+    } catch (brevoErr) {
+      console.error('❌ [BREVO EXCEPTION] Request failed:', brevoErr)
+    }
+  }
+
   if (mailTransporter) {
     try {
       const user = process.env.SMTP_USER || env.SMTP_USER
@@ -146,7 +189,7 @@ export async function sendOtpEmail({ to, name, otp }: SendOtpEmailOptions): Prom
         text: textContent,
         html: htmlContent,
       })
-      console.log(`📧 [EMAIL SENT] Verification OTP sent successfully to ${maskEmail(to)}`)
+      console.log(`📧 [EMAIL SENT VIA SMTP] Verification OTP sent successfully to ${maskEmail(to)}`)
       return { success: true }
     } catch (err) {
       console.error(`❌ [EMAIL ERROR] Failed to deliver email to ${to} via SMTP:`, err)
@@ -165,7 +208,7 @@ export async function sendOtpEmail({ to, name, otp }: SendOtpEmailOptions): Prom
     `└─────────────────────────────────────────────────────────────┘\n`
   )
 
-  return { success: true, simulated: !mailTransporter }
+  return { success: true, simulated: !brevoApiKey && !mailTransporter }
 }
 
 function escapeHtml(str: string): string {

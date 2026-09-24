@@ -19,6 +19,8 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional().default('Gopinathji Gems <no-reply@gopinathjigems.com>'),
+  BREVO_API_KEY: z.string().optional(),
+  BREVO_SENDER_EMAIL: z.string().optional(),
 })
 
 const parsed = envSchema.safeParse(process.env)
