@@ -1,7 +1,7 @@
 import type { AuditLog, AccountingYear, CompanySettings, Notification, Party, Transaction, User, ExpenseCategory } from '../types'
 import { DEFAULT_SETTINGS } from '../data/mockData'
 
-export const API_URL = import.meta.env.API_LINK ?? 'http://localhost:3001/api'
+export const API_URL = import.meta.env.VITE_API_LINK ?? 'http://localhost:3001/api'
 const TOKEN_KEY = 'jikadara_erp_token'
 
 interface ApiEnvelope<T> {
