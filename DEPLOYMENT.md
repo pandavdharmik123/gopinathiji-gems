@@ -321,7 +321,7 @@ Unset secrets are exposed as empty strings by GitHub Actions; the backup config 
 
 - **GitHub schedules are UTC and best-effort.** A run can be delayed by a few minutes during peak load. That is fine for a daily backup.
 - **Scheduled workflows are disabled after 60 days of repository inactivity.** Any push or a manual run re-enables them. If the repo is quiet, add a monthly commit or manually run the workflow.
-- **`pg_dump` version:** `ubuntu-latest` ships PostgreSQL 16. If Render upgrades the database to 17+, install `postgresql-client-17` from the PGDG repository in the workflow.
+- **`pg_dump` version:** `pg_dump` must match the server's major version. `ubuntu-latest` ships PostgreSQL 16, but Supabase runs 17.x, so the workflow installs `postgresql-client-17` from the PGDG repository and puts it first on `PATH`. If you upgrade the database to 18+, bump the client version in `.github/workflows/backup.yml`.
 - **External database access:** the workflow needs the Render *external* URL, not the internal one. Keep it in a secret; it contains database credentials.
 - **Cold starts:** the first daytime request after idle takes ~30–60s. If that is unacceptable, you can add an external warm-up window (cron-job.org) during business hours, but it consumes instance-hours.
 

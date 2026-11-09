@@ -55,14 +55,21 @@ jobs:
         working-directory: server
         run: npm ci --include=dev
 
-      # pg_dump must be the same major version or newer than the PostgreSQL
-      # server. ubuntu-latest ships PostgreSQL 16; if Render runs PostgreSQL 17+,
-      # install postgresql-client-17 from the PGDG repository instead.
-      - name: Install PostgreSQL client
+      # pg_dump must be the same major version or newer than the database
+      # server. ubuntu-latest ships PostgreSQL 16, but Supabase runs 17.x, and
+      # pg_dump refuses to dump a newer server ("server version mismatch").
+      # Install the matching client from the PGDG repository and put it first
+      # on PATH for the backup step.
+      - name: Install PostgreSQL client 17
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client
-          pg_dump --version
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Verify pg_dump version
+        run: pg_dump --version
 
       - name: Run backup
         working-directory: server
