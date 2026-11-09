@@ -1,0 +1,90 @@
+name: Google Drive backup
+
+# Runs the existing CLI backup (pg_dump -> encrypt -> Google Drive -> retention)
+# entirely on GitHub's runners, so the Render web service does not need to wake up.
+#
+# Required repository secrets:
+#   PROD_DATABASE_URL            Render External Database URL (include ?sslmode=require)
+#   GOOGLE_DRIVE_CLIENT_ID
+#   GOOGLE_DRIVE_CLIENT_SECRET
+#   GOOGLE_DRIVE_REFRESH_TOKEN
+#
+# Optional repository secrets:
+#   GOOGLE_DRIVE_ACCOUNT_EMAIL
+#   GOOGLE_DRIVE_BACKUP_FOLDER_ID
+#   DB_BACKUP_ENCRYPTION_KEY     (32+ characters)
+#
+# Schedule must be in UTC. 20:30 UTC = 02:00 Asia/Kolkata (UTC+05:30).
+# GitHub can delay scheduled runs by a few minutes during peak load.
+
+on:
+  schedule:
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dump the database but do not upload to Google Drive'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: drive-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Backup production database
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci --include=dev
+
+      # pg_dump must be the same major version or newer than the PostgreSQL
+      # server. ubuntu-latest ships PostgreSQL 16; if Render runs PostgreSQL 17+,
+      # install postgresql-client-17 from the PGDG repository instead.
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          pg_dump --version
+
+      - name: Run backup
+        working-directory: server
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          PGSSLMODE: require
+          # The in-process scheduler stays off; this workflow is the scheduler.
+          GOOGLE_DRIVE_BACKUP_ENABLED: 'false'
+          # Optional repository variable; must match the filename prefix you want.
+          PROJECT_NAME: ${{ vars.BACKUP_PROJECT_NAME || 'gopinathij-gems' }}
+          GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
+          GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
+          GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_REFRESH_TOKEN }}
+          GOOGLE_DRIVE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_DRIVE_ACCOUNT_EMAIL }}
+          GOOGLE_DRIVE_BACKUP_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_BACKUP_FOLDER_ID }}
+          DB_BACKUP_ENCRYPTION_KEY: ${{ secrets.DB_BACKUP_ENCRYPTION_KEY }}
+          DB_BACKUP_KEEP_DAILY: '30'
+          DB_BACKUP_KEEP_WEEKLY: '12'
+          DB_BACKUP_KEEP_MONTHLY: '12'
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            npm run backup -- --dry-run
+          else
+            npm run backup
+          fi

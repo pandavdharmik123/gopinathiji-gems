@@ -12,8 +12,9 @@ This document covers the safe release flow for the Gopinathji Gems backend and f
 4. Set Render's **Pre-Deploy Command** to `npm run release`, then push/resume auto-deploy.
 5. On Vercel, set `VITE_API_LINK=https://<your-api>.onrender.com/api` and redeploy (see section 6).
 6. Set the backend's `CORS_ORIGIN` to the Vercel domain and redeploy the API.
+7. Disable the self keep-alive and move backups to GitHub Actions to cut Render hours (see section 7).
 
-Sections 5 and 6 cover the exact settings.
+Sections 5–7 cover the exact settings.
 
 ---
 
@@ -192,6 +193,10 @@ JWT_SECRET=<64-byte random hex>
 CORS_ORIGIN=https://your-app.vercel.app
 SERVER_URL=https://your-api.onrender.com
 RENDER_EXTERNAL_URL=https://your-api.onrender.com
+# Keep the free instance asleep when idle (see section 7)
+KEEP_ALIVE_ENABLED=false
+# Backups are handled by GitHub Actions (see section 7)
+GOOGLE_DRIVE_BACKUP_ENABLED=false
 ```
 
 ---
@@ -248,7 +253,89 @@ Preview deployments get a new URL on every push. Either add those URLs to `CORS_
 
 ---
 
-## 7. Pre-deploy checklist
+## 7. Reducing Render instance hours
+
+Render's free allowance is **750 instance-hours per workspace per month**, shared by every free service. If another service runs 24/7, it consumes roughly 720–744 hours, leaving very little for this app. Two repo changes keep this service asleep except when someone is actually using it:
+
+### 7.1 Self keep-alive is now off by default
+
+`server/src/lib/keepAlive.ts` used to ping its own `/health` every 5 minutes forever, which kept the instance running 24/7. It now requires an explicit opt-in:
+
+```env
+KEEP_ALIVE_ENABLED=false
+```
+
+Leave it `false` on Render. An always-on instance would consume the whole allowance by itself. The trade-off is a ~30–60s cold start on the first request after 15 minutes of inactivity.
+
+### 7.2 Backups run on GitHub Actions, not Render
+
+`.github/workflows/backup.yml` runs the existing CLI backup (`npm run backup`) against the production database on GitHub's runners. It performs `pg_dump`, optional encryption, Google Drive upload, and retention, then exits. **The Render web service never wakes up for backups** — zero instance-hours.
+
+It runs daily at **20:30 UTC = 02:00 Asia/Kolkata**. You can also run it manually from **Actions → Google Drive backup → Run workflow**; set `dry_run` to test `pg_dump` without uploading.
+
+On Render, disable the in-process scheduler to avoid duplicate backups when the service happens to be awake:
+
+```env
+GOOGLE_DRIVE_BACKUP_ENABLED=false
+```
+
+Manual backups from the app UI still work; that flag only controls the cron scheduler.
+
+Once the GitHub Actions backup is verified, you can **remove the Google Drive credentials from Render entirely**. They are only needed by the app process for manual Drive backups, the Drive status/browse APIs, and the in-process scheduler. The GitHub workflow uses its own repository secrets.
+
+| Runtime feature | Needs Drive credentials on Render? |
+|---|---|
+| Scheduled backup (GitHub Actions) | ❌ No — uses GitHub secrets |
+| Manual “backup now” via API/UI | ✅ Yes |
+| Drive file listing/status APIs | ✅ Yes |
+| Excel export / preview / restore | ❌ No — no Drive access |
+| `backup_runs` history | ❌ No — reads the database |
+
+If you remove them, those manual Drive endpoints return `503 Google Drive backup is not configured`. Nothing in the web UI calls them, so the app keeps working normally. Use the GitHub **Run workflow** button when you need an on-demand backup.
+
+Keep `DB_BACKUP_ENCRYPTION_KEY` (if you use encrypted backups) in a password manager and in GitHub secrets: encrypted `.dump.enc` files cannot be restored without it.
+
+### 7.3 GitHub repository secrets and variables
+
+Add these under **Settings → Secrets and variables → Actions**:
+
+| Secret | Required | Value |
+|---|---|---|
+| `PROD_DATABASE_URL` | yes | Render **External** Database URL, including `?sslmode=require` |
+| `GOOGLE_DRIVE_CLIENT_ID` | yes | same value as Render |
+| `GOOGLE_DRIVE_CLIENT_SECRET` | yes | same value as Render |
+| `GOOGLE_DRIVE_REFRESH_TOKEN` | yes | same value as Render |
+| `GOOGLE_DRIVE_ACCOUNT_EMAIL` | recommended | expected Drive account |
+| `GOOGLE_DRIVE_BACKUP_FOLDER_ID` | optional | existing Drive folder ID |
+| `DB_BACKUP_ENCRYPTION_KEY` | optional | 32+ characters |
+
+Optional repository **variable**:
+
+| Variable | Value |
+|---|---|
+| `BACKUP_PROJECT_NAME` | filename prefix, e.g. `advocate-management` |
+
+Unset secrets are exposed as empty strings by GitHub Actions; the backup config now treats empty values as "not set", so optional secrets can be left blank.
+
+### 7.4 Caveats
+
+- **GitHub schedules are UTC and best-effort.** A run can be delayed by a few minutes during peak load. That is fine for a daily backup.
+- **Scheduled workflows are disabled after 60 days of repository inactivity.** Any push or a manual run re-enables them. If the repo is quiet, add a monthly commit or manually run the workflow.
+- **`pg_dump` version:** `ubuntu-latest` ships PostgreSQL 16. If Render upgrades the database to 17+, install `postgresql-client-17` from the PGDG repository in the workflow.
+- **External database access:** the workflow needs the Render *external* URL, not the internal one. Keep it in a secret; it contains database credentials.
+- **Cold starts:** the first daytime request after idle takes ~30–60s. If that is unacceptable, you can add an external warm-up window (cron-job.org) during business hours, but it consumes instance-hours.
+
+### 7.5 Verify after the first run
+
+1. GitHub **Actions → Google Drive backup** shows a green run.
+2. The `.dump` (or `.enc`) file appears in the Drive folder.
+3. In the app (admin) or the database, the latest `backup_runs` row is `SUCCESS`.
+4. Render **Events/Logs** show the service spinning down after ~15 idle minutes.
+5. Next morning, confirm another backup landed.
+
+---
+
+## 8. Pre-deploy checklist
 
 - [ ] Verified database backup exists and was restored successfully on a staging copy.
 - [ ] `npm run db:preflight` passes against the production database.
@@ -257,11 +344,11 @@ Preview deployments get a new URL on every push. Either add those URLs to `CORS_
 - [ ] Google Drive backup credentials and encryption key configured (if used).
 - [ ] Password hashes rotated if the pre-fix backup endpoints were ever exposed externally.
 - [ ] CI is green on the commit being deployed (`.github/workflows/ci.yml`).
-- [ ] Rollback plan confirmed (see section 9).
+- [ ] Rollback plan confirmed (see section 10).
 
 ---
 
-## 8. Post-deploy smoke test
+## 9. Post-deploy smoke test
 
 1. `GET /health` returns `200`.
 2. Admin can log in; invalid login returns `401`.
@@ -275,7 +362,7 @@ Preview deployments get a new URL on every push. Either add those URLs to `CORS_
 
 ---
 
-## 9. Rollback
+## 10. Rollback
 
 Migrations are forward-only.
 
@@ -288,7 +375,7 @@ Keep the previous release artifact available until the smoke test passes.
 
 ---
 
-## 10. CI pipeline
+## 11. CI pipeline
 
 `.github/workflows/ci.yml` runs on pushes and pull requests:
 

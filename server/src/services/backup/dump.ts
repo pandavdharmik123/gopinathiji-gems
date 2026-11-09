@@ -18,6 +18,7 @@ function parseDatabaseUrl(databaseUrl: string): {
   dbname: string
   user: string
   password: string
+  sslmode: string | null
 } {
   const url = new URL(databaseUrl)
   return {
@@ -26,6 +27,7 @@ function parseDatabaseUrl(databaseUrl: string): {
     dbname: url.pathname.replace(/^\//, ''),
     user: url.username,
     password: decodeURIComponent(url.password),
+    sslmode: url.searchParams.get('sslmode'),
   }
 }
 
@@ -45,7 +47,7 @@ export async function dumpDatabase(): Promise<DumpResult> {
     throw new Error('DATABASE_URL is not set')
   }
 
-  const { host, port, dbname, user, password } = parseDatabaseUrl(databaseUrl)
+  const { host, port, dbname, user, password, sslmode } = parseDatabaseUrl(databaseUrl)
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
   const projectName = backupConfig.PROJECT_NAME
@@ -67,6 +69,9 @@ export async function dumpDatabase(): Promise<DumpResult> {
         env: {
           ...process.env,
           PGPASSWORD: password,
+          // Render's external database connections require SSL. Honour the
+          // sslmode from DATABASE_URL when present.
+          ...(sslmode ? { PGSSLMODE: sslmode } : {}),
         },
       }
     )

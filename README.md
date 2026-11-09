@@ -64,7 +64,7 @@ This project uses a monorepo-style structure where the frontend and backend are 
 
 ## Production
 
-See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the release flow, one-time database baseline, environment checklist, migrations, rollback, and CI pipeline.
+See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the release flow, one-time database baseline, environment checklist, migrations, rollback, CI pipeline, and the Render cost setup (idle spin-down + GitHub Actions backups).
 
 ## Key Files & Directories
 

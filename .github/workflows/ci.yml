@@ -79,6 +79,17 @@ jobs:
         working-directory: server
         run: npx ts-node --transpile-only qa/seed-qa.ts
 
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Verify backup pipeline (dry run, no Drive upload)
+        working-directory: server
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gopinathji_gems_qa
+          GOOGLE_DRIVE_BACKUP_ENABLED: 'false'
+          PROJECT_NAME: qa
+        run: npm run backup -- --dry-run
+
       - name: Type-check server
         working-directory: server
         run: npx tsc --noEmit

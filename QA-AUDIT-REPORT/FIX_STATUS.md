@@ -77,6 +77,8 @@ The risky `prisma db push` build step has been removed:
   - `20261110000100_constraints` — CHECK / partial-unique / exclusion constraints
 - Existing databases get a one-time baseline (`npm run db:baseline`) before migrating.
 - Render: build no longer touches the DB; set **Pre-Deploy Command** to `npm run release`.
+- Render cost: `KEEP_ALIVE_ENABLED` now defaults to `false`, so the instance spins down when idle.
+- Backups: `.github/workflows/backup.yml` runs the CLI backup on GitHub runners at 02:00 IST, so the Render web service does not wake for backups (zero instance-hours).
 - Vercel: set `VITE_API_LINK` and the backend `CORS_ORIGIN`; SPA rewrites already configured.
 - `.github/workflows/ci.yml` runs migrations, the existing-database baseline path, all test suites, type-checks, audit, and the production build on every push/PR.
 - Full instructions: [`DEPLOYMENT.md`](../DEPLOYMENT.md).

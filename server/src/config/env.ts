@@ -23,6 +23,12 @@ const envSchema = z.object({
   BREVO_SENDER_EMAIL: z.string().optional(),
 
   // ─── Keep-Alive ────────────────────────────────────────────────────────────
+  // Off by default: a self-ping keeps the Render instance awake 24/7 and
+  // consumes the free instance-hour allowance.
+  KEEP_ALIVE_ENABLED: z.preprocess(
+    v => v === 'true' || v === true,
+    z.boolean().default(false)
+  ),
   SERVER_URL: z.string().url().optional(),
   RENDER_EXTERNAL_URL: z.string().url().optional(),
 

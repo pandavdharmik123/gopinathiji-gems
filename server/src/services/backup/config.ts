@@ -17,7 +17,13 @@ const backupEnvSchema = z.object({
   DB_BACKUP_ENCRYPTION_KEY: z.string().min(32).optional(),
 })
 
-const parsed = backupEnvSchema.safeParse(process.env)
+const parsed = backupEnvSchema.safeParse(
+  // GitHub Actions and some hosts expose unset secrets as empty strings.
+  // Treat "" as "not set" so defaults and optional fields still work.
+  Object.fromEntries(
+    Object.entries(process.env).filter(([, value]) => value !== undefined && value !== '')
+  )
+)
 
 if (!parsed.success) {
   console.error('⚠️  Backup config validation errors:', parsed.error.flatten().fieldErrors)
