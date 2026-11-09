@@ -1,5 +1,7 @@
 import ExcelJS from 'exceljs'
 import officeCrypto from 'officecrypto-tool'
+import * as bcrypt from 'bcryptjs'
+import { randomBytes } from 'node:crypto'
 import { prisma } from '../lib/prisma'
 import { Prisma } from '@prisma/client'
 
@@ -60,9 +62,11 @@ function autoFitColumns(worksheet: ExcelJS.Worksheet) {
 }
 
 /**
- * Fetch all data from database for backup
+ * Fetch all data from database for backup.
+ * Credential material (password hashes, PIN hashes, 2FA secrets) is excluded
+ * unless the caller explicitly opts in for an encrypted administrative backup.
  */
-export async function getAllBackupData(): Promise<BackupData> {
+export async function getAllBackupData(includeSensitive = false): Promise<BackupData> {
   const [
     companySettings,
     parties,
@@ -83,6 +87,12 @@ export async function getAllBackupData(): Promise<BackupData> {
     prisma.user.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' } })
   ])
+
+  const safeUsers = users.map((u) => {
+    if (includeSensitive) return u
+    const { passwordHash, pinHash, twoFactorSecret, emailOtpHash, ...safe } = u
+    return safe
+  })
 
   return {
     version: '1.0.0',
@@ -105,7 +115,7 @@ export async function getAllBackupData(): Promise<BackupData> {
     })),
     accountingYears,
     expenseCategories,
-    users,
+    users: safeUsers,
     auditLogs
   }
 }
@@ -113,8 +123,8 @@ export async function getAllBackupData(): Promise<BackupData> {
 /**
  * Export data to an ExcelJS workbook buffer and optionally encrypt with password
  */
-export async function exportDataToExcel(password?: string): Promise<Buffer> {
-  const data = await getAllBackupData()
+export async function exportDataToExcel(password?: string, includeSensitive = Boolean(password)): Promise<Buffer> {
+  const data = await getAllBackupData(includeSensitive)
   const workbook = new ExcelJS.Workbook()
   workbook.creator = 'Gopinathji Gems ERP'
   workbook.lastModifiedBy = 'Gopinathji Gems ERP'
@@ -719,7 +729,10 @@ export async function restoreDataFromExcel(fileBuffer: Buffer, password?: string
             id: u.id || undefined,
             name: u.name || u.username,
             username: u.username,
-            passwordHash: u.passwordHash || '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // default hash if empty
+            // Never install a known/default credential. When a backup omits the
+            // hash, generate an unguessable random password that nobody knows;
+            // the account can only be recovered through an explicit reset.
+            passwordHash: u.passwordHash || await bcrypt.hash(randomBytes(32).toString('hex'), 12),
             role: ['admin', 'manager', 'employee'].includes(u.role) ? u.role : 'employee',
             email: u.email,
             status: u.status === 'inactive' ? 'inactive' : 'active',

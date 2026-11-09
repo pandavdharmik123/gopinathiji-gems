@@ -382,7 +382,19 @@ export const api = {
   },
 
   transactions: {
-    list: () => getData('/transactions?limit=500', normalizeTransaction),
+    // The API caps a single page at 200 rows. Walk the pages so the dashboard
+    // and reports always see the complete ledger instead of a truncated slice.
+    list: async () => {
+      const pageSize = 200
+      const first = await request<ApiEnvelope<any[]>>(`/transactions?limit=${pageSize}&page=1`)
+      const rows = [...(first.data ?? [])]
+      const pages = Number((first as any).meta?.pages ?? 1)
+      for (let page = 2; page <= pages; page++) {
+        const next = await request<ApiEnvelope<any[]>>(`/transactions?limit=${pageSize}&page=${page}`)
+        rows.push(...(next.data ?? []))
+      }
+      return rows.map(normalizeTransaction)
+    },
     create: async (data: Omit<Transaction, 'id' | 'voucherNo' | 'partyName' | 'createdBy' | 'createdAt' | 'updatedAt'>) => {
       const envelope = await request<ApiEnvelope<any>>('/transactions', { method: 'POST', body: JSON.stringify(data) })
       return normalizeTransaction(envelope.data)
@@ -498,6 +510,7 @@ export const api = {
       const formData = new FormData()
       formData.append('file', file)
       if (password) formData.append('password', password)
+      formData.append('confirm', 'RESTORE')
 
       const headers: Record<string, string> = {}
       if (token) headers['Authorization'] = `Bearer ${token}`

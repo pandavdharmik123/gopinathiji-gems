@@ -257,11 +257,31 @@ textarea,
   display: none;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .date-pill {
   background: var(--muted);
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
+}
+
+/* Ant Design's default secondary text (#8c8c8c) fails WCAG AA on light
+   surfaces (3.36:1). Use a darker slate so all secondary copy clears 4.5:1. */
+.ant-typography.ant-typography-secondary,
+.ant-breadcrumb-link,
+.ant-breadcrumb-separator {
+  color: #4b5563 !important;
 }
 
 .header-user-chip:hover {

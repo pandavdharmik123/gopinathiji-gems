@@ -48,16 +48,23 @@ This project uses a monorepo-style structure where the frontend and backend are 
    - Configure your `.env` files in both the root directory and the `server/` directory based on `.env.example`.
    - Ensure `DATABASE_URL` is pointing to a valid PostgreSQL instance.
 
-3. **Database Migration:**
+3. **Database Setup:**
    ```bash
    cd server
-   npx prisma db push
+   # New/empty database:
+   npm run release
+   # Existing database created before migrations:
+   # npm run db:baseline && npm run release
    ```
 
 4. **Start the Development Servers:**
    The Vite frontend and the Express backend can be run in separate terminal tabs, or via a unified runner.
    - Frontend: `npm run dev` (Runs on `$PORT`, default 8443)
    - Backend: `npm run dev` inside the `server/` directory.
+
+## Production
+
+See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the release flow, one-time database baseline, environment checklist, migrations, rollback, and CI pipeline.
 
 ## Key Files & Directories
 

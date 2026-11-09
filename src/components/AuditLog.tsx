@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Input, Select, Tag, Card, Typography, Space } from 'antd'
-import { Search, Clock, Plus, Edit2, Trash2, BookOpen, Building2, RotateCw, Settings, FileText } from 'lucide-react'
+import { Input, Select, Tag, Card, Typography } from 'antd'
+import { Search, Clock, Plus, Trash2, BookOpen, Building2, RotateCw, Settings, FileText } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 
 export default function AuditLog() {

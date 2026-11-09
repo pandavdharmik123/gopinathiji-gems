@@ -1,5 +1,5 @@
-import { Drawer, Button, Badge, List, Tag, Typography, Space } from 'antd'
-import { Bell, CheckCircle, AlertTriangle, Info, XCircle, Trash2, X } from 'lucide-react'
+import { Drawer, Button, Badge, List, Typography, Space } from 'antd'
+import { Bell, CheckCircle, AlertTriangle, Info, XCircle, X } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 
 interface NotificationPanelProps {
@@ -23,9 +23,6 @@ const typeBg: Record<string, string> = {
 }
 const typeColor: Record<string, string> = {
   warning: '#854d0e', info: '#1e40af', error: '#991b1b', success: '#166534'
-}
-const typeTagColor: Record<string, string> = {
-  warning: 'warning', info: 'processing', error: 'error', success: 'success'
 }
 
 export default function NotificationPanel({ open, onClose }: NotificationPanelProps) {

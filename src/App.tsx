@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { Alert, Avatar, Breadcrumb, Button, Layout, Space, Typography, Select, Popover, Tag, notification } from 'antd'
 import { Menu as MenuIcon, Languages, ChevronDown, User as UserIcon, LogOut } from 'lucide-react'
 import { AppProvider, useApp } from './store/AppContext'
@@ -6,20 +6,23 @@ import type { User } from './types'
 import { api, clearToken, getToken, getTokenExp, isTokenExpired } from './lib/api'
 import Login from './components/Login'
 import Sidebar, { type Page } from './components/Sidebar'
-import Dashboard from './components/Dashboard'
-import Income from './components/Income'
-import Expense from './components/Expense'
-import CashBook from './components/CashBook'
-import Parties from './components/Parties'
-import Ledger from './components/Ledger'
-import Reports from './components/Reports'
-import Users from './components/Users'
-import AuditLog from './components/AuditLog'
-import Settings from './components/Settings'
-import Transactions from './components/Transactions'
-import CalendarView from './components/CalendarView'
-import Profile from './components/Profile'
 import LoadingScreen from './components/LoadingScreen'
+
+// Pages are split into their own chunks so the initial bundle stays small.
+// They are only downloaded when the user first visits the route.
+const Dashboard = lazy(() => import('./components/Dashboard'))
+const Income = lazy(() => import('./components/Income'))
+const Expense = lazy(() => import('./components/Expense'))
+const CashBook = lazy(() => import('./components/CashBook'))
+const Parties = lazy(() => import('./components/Parties'))
+const Ledger = lazy(() => import('./components/Ledger'))
+const Reports = lazy(() => import('./components/Reports'))
+const Users = lazy(() => import('./components/Users'))
+const AuditLog = lazy(() => import('./components/AuditLog'))
+const Settings = lazy(() => import('./components/Settings'))
+const Transactions = lazy(() => import('./components/Transactions'))
+const CalendarView = lazy(() => import('./components/CalendarView'))
+const Profile = lazy(() => import('./components/Profile'))
 
 const PAGE_TO_ROUTE: Record<Page, string> = {
   dashboard: '/dashboard',
@@ -54,6 +57,71 @@ const ROUTE_TO_PAGE: Record<string, Page> = {
   '/profile': 'profile',
 }
 
+// Central route-authorisation map. This is the single source of truth for
+// both direct URL access and sidebar visibility.
+const PAGE_ROLES: Record<Page, string[]> = {
+  dashboard: ['admin', 'manager', 'employee'],
+  calendar: ['admin', 'manager', 'employee'],
+  income: ['admin', 'manager', 'employee'],
+  expense: ['admin', 'manager', 'employee'],
+  profile: ['admin', 'manager', 'employee'],
+  transactions: ['admin', 'manager'],
+  cashbook: ['admin', 'manager'],
+  parties: ['admin', 'manager'],
+  ledger: ['admin', 'manager'],
+  reports: ['admin', 'manager'],
+  users: ['admin'],
+  settings: ['admin'],
+  audit: ['admin'],
+}
+
+function AccessDenied({ onGoHome }: { onGoHome: () => void }) {
+  return (
+    <div
+      role="alert"
+      style={{
+        maxWidth: 520,
+        margin: '64px auto',
+        padding: '32px',
+        textAlign: 'center',
+        background: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: 16,
+      }}
+    >
+      <Typography.Title level={2} style={{ marginTop: 0 }}>Access denied</Typography.Title>
+      <Typography.Paragraph type="secondary">
+        You do not have permission to view this page.
+      </Typography.Paragraph>
+      <Button type="primary" onClick={onGoHome}>Go to dashboard</Button>
+    </div>
+  )
+}
+
+function NotFound({ onGoHome }: { onGoHome: () => void }) {
+  return (
+    <div
+      role="alert"
+      style={{
+        maxWidth: 520,
+        margin: '64px auto',
+        padding: '32px',
+        textAlign: 'center',
+        background: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: 16,
+      }}
+    >
+      <Typography.Title level={1} style={{ marginTop: 0 }}>404</Typography.Title>
+      <Typography.Title level={2} style={{ marginTop: 0, fontSize: '1.2rem' }}>Page not found</Typography.Title>
+      <Typography.Paragraph type="secondary">
+        The page you are looking for does not exist.
+      </Typography.Paragraph>
+      <Button type="primary" onClick={onGoHome}>Go to dashboard</Button>
+    </div>
+  )
+}
+
 const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:'
 const isElectron = typeof window !== 'undefined' && (Boolean((window as any).electronAPI?.isElectron) || isFileProtocol)
 
@@ -76,6 +144,30 @@ function getPageFromLocation(): Page {
   return 'dashboard'
 }
 
+/**
+ * True when the current URL does not map to a known page. The router falls
+ * back to the dashboard for rendering, but we still show a 404 so a mistyped
+ * or stale link is not silently presented as the dashboard.
+ */
+function isUnknownLocation(): boolean {
+  if (typeof window === 'undefined') return false
+
+  if (window.location.hash) {
+    const rawHash = window.location.hash.replace(/^#\/?/, '/')
+    const cleanHash = rawHash.endsWith('/') && rawHash.length > 1 ? rawHash.slice(0, -1) : rawHash
+    return !ROUTE_TO_PAGE[cleanHash]
+  }
+
+  if (!isFileProtocol) {
+    const cleanPath = window.location.pathname.endsWith('/') && window.location.pathname.length > 1
+      ? window.location.pathname.slice(0, -1)
+      : window.location.pathname
+    return cleanPath !== '/' && !ROUTE_TO_PAGE[cleanPath]
+  }
+
+  return false
+}
+
 export default function App() {
   return (
     <AppProvider>
@@ -89,6 +181,7 @@ function AppInner() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [activePage, setActivePageInternal] = useState<Page>(() => getPageFromLocation())
+  const [routeNotFound, setRouteNotFound] = useState(() => isUnknownLocation())
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
@@ -108,6 +201,7 @@ function AppInner() {
 
   const handleNavigate = (page: Page, replace = false) => {
     setActivePageInternal(page)
+    setRouteNotFound(false)
     const route = PAGE_TO_ROUTE[page] || '/dashboard'
 
     if (isElectron || isFileProtocol) {
@@ -135,6 +229,7 @@ function AppInner() {
     const handleLocationChange = () => {
       const page = getPageFromLocation()
       setActivePageInternal(page)
+      setRouteNotFound(isUnknownLocation())
     }
     window.addEventListener('popstate', handleLocationChange)
     window.addEventListener('hashchange', handleLocationChange)
@@ -244,6 +339,15 @@ function AppInner() {
   }
 
   const renderPage = () => {
+    if (routeNotFound) {
+      return <NotFound onGoHome={() => handleNavigate('dashboard')} />
+    }
+
+    const allowedRoles = PAGE_ROLES[activePage]
+    if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
+      return <AccessDenied onGoHome={() => handleNavigate('dashboard', true)} />
+    }
+
     switch (activePage) {
       case 'dashboard': return <Dashboard currentUser={currentUser} onNavigate={handleNavigate} onUserUpdate={setCurrentUser} />
       case 'income': return <Income currentUser={currentUser} />
@@ -406,6 +510,7 @@ function AppInner() {
           <Space size={14}>
             <Select
               className="year-select"
+              aria-label={t('nav.accountingYears')}
               placeholder={t('nav.accountingYears')}
               value={state.selectedYearId}
               onChange={v => setSelectedYearId(v)}
@@ -434,7 +539,7 @@ function AppInner() {
               onOpenChange={setUserMenuOpen}
               styles={{
                 body: { padding: 0, overflow: 'hidden', borderRadius: 12, boxShadow: '0 10px 28px rgba(15, 23, 42, 0.12)' }
-              }}
+              } as any}
             >
               <div
                 className="header-user-chip"
@@ -485,9 +590,11 @@ function AppInner() {
           ) : (
             <>
               {(loading || error) && (
-                <Alert type={error ? 'error' : 'info'} showIcon message={error || t('general.saving')} style={{ marginBottom: 16 }} />
+                <Alert type={error ? 'error' : 'info'} showIcon title={error || t('general.saving')} style={{ marginBottom: 16 }} />
               )}
-              {renderPage()}
+              <Suspense fallback={<LoadingScreen />}>
+                {renderPage()}
+              </Suspense>
             </>
           )}
         </Layout.Content>

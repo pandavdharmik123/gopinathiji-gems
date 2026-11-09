@@ -1,4 +1,4 @@
-import type { CompanySettings, AccountingYear, Transaction, Party, User } from '../types'
+import type { CompanySettings, AccountingYear, Transaction, Party } from '../types'
 import { formatCurrency } from '../data/mockData'
 import logoTwo from '../assets/logoTwo.png'
 
@@ -110,7 +110,7 @@ export function printPDFReport(options: PDFReportOptions) {
 
   // Build Sections Tables HTML
   let sectionsHtml = ''
-  sections.forEach((sec, sIdx) => {
+  sections.forEach((sec) => {
     let rowsHtml = ''
     if (sec.rows.length === 0) {
       rowsHtml = `
@@ -347,15 +347,6 @@ export function printPDFReport(options: PDFReportOptions) {
     <!-- Tables -->
     ${sectionsHtml}
 
-    <!-- Footer -->
-    <div class="footer">
-      <div>
-        ◆ <strong>${escapeHtml(companyName)}</strong> &nbsp;•&nbsp; ${isGu ? 'ગોપનીય વ્યાપારી દસ્તાવેજ' : 'Confidential Business Document'}
-      </div>
-      <div>
-        ${isGu ? 'કમ્પ્યુટર જનરેટેડ રિપોર્ટ' : 'Computer Generated Report'}
-      </div>
-    </div>
   </div>
 
   <script>
@@ -927,7 +918,7 @@ export function exportCashBookPDF(
  */
 export function exportComprehensiveReportsPDF(
   transactions: Transaction[],
-  parties: Party[],
+  _parties: Party[],
   settings: CompanySettings,
   year?: AccountingYear,
   dateRangeStr?: string,

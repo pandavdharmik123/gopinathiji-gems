@@ -1,5 +1,7 @@
 import './config/env' // Must be first — validates env vars
 import express from 'express'
+import { startKeepAlive } from './lib/keepAlive'
+import { initBackupScheduler } from './services/backup/scheduler'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
@@ -120,6 +122,8 @@ async function bootstrap() {
       console.log(`   → http://localhost:${env.PORT}`)
       console.log(`   → http://localhost:${env.PORT}/health`)
       console.log(`   → Environment: ${env.NODE_ENV}\n`)
+      startKeepAlive()
+      initBackupScheduler()
     })
   } catch (err) {
     console.error('❌ Failed to start server:', err)

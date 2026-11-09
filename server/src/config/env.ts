@@ -21,6 +21,26 @@ const envSchema = z.object({
   SMTP_FROM: z.string().optional().default('Gopinathji Gems <no-reply@gopinathjigems.com>'),
   BREVO_API_KEY: z.string().optional(),
   BREVO_SENDER_EMAIL: z.string().optional(),
+
+  // ─── Keep-Alive ────────────────────────────────────────────────────────────
+  SERVER_URL: z.string().url().optional(),
+  RENDER_EXTERNAL_URL: z.string().url().optional(),
+
+  // ─── Google Drive Backup ───────────────────────────────────────────────────
+  GOOGLE_DRIVE_BACKUP_ENABLED: z.string().optional().default('false'),
+  PROJECT_NAME: z.string().optional().default('gopinathji-gems'),
+  GOOGLE_DRIVE_CLIENT_ID: z.string().optional(),
+  GOOGLE_DRIVE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_DRIVE_REDIRECT_URI: z.string().optional().default('http://localhost:5555/oauth2callback'),
+  GOOGLE_DRIVE_ACCOUNT_EMAIL: z.string().email().optional(),
+  GOOGLE_DRIVE_REFRESH_TOKEN: z.string().optional(),
+  GOOGLE_DRIVE_BACKUP_FOLDER_ID: z.string().optional(),
+  DB_BACKUP_SCHEDULE: z.string().optional().default('0 2 * * *'),
+  DB_BACKUP_TIMEZONE: z.string().optional().default('Asia/Kolkata'),
+  DB_BACKUP_KEEP_DAILY: z.coerce.number().optional().default(30),
+  DB_BACKUP_KEEP_WEEKLY: z.coerce.number().optional().default(12),
+  DB_BACKUP_KEEP_MONTHLY: z.coerce.number().optional().default(12),
+  DB_BACKUP_ENCRYPTION_KEY: z.string().min(32).optional(),
 })
 
 const parsed = envSchema.safeParse(process.env)

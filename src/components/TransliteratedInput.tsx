@@ -1,7 +1,5 @@
-import React from 'react'
 import { IndicTransliterate } from '@ai4bharat/indic-transliterate'
 import { Input, type InputProps } from 'antd'
-import { useApp } from '../store/AppContext'
 import { API_URL } from '../lib/api'
 
 // Pre-populate sessionStorage to bypass the library's initial render fetch to xlit-api.ai4bharat.org/languages which is decommissioned.

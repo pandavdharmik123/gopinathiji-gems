@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Button, Input, Modal, Select, Table, Tag, Typography, DatePicker } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { Plus, Search, Pencil, Trash2, Download, FileText, X } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, FileText, X } from 'lucide-react'
 import { useApp } from '../store/AppContext'
-import { PAYMENT_MODES, INCOME_CATEGORIES, EXPENSE_CATEGORIES, formatCurrency, todayStr } from '../data/mockData'
+import { PAYMENT_MODES, formatCurrency, todayStr } from '../data/mockData'
 import { exportTransactionsPDF } from '../lib/pdfReportGenerator'
 import type { Transaction, User } from '../types'
 import dayjs from 'dayjs'
@@ -109,14 +109,14 @@ export default function Transactions({ currentUser }: TransactionsProps) {
     setShowModal(true)
   }
 
-  const handleDelete = async (t: Transaction) => {
+  const handleDelete = async (txn: Transaction) => {
     if (currentUser.role !== 'admin') return
     const msg = state.language === 'gu'
-      ? `શું આ વ્યવહાર (${t.voucherNo}) કાઢી નાખવો છે?`
-      : `Are you sure you want to delete transaction ${t.voucherNo}?`
+      ? `શું આ વ્યવહાર (${txn.voucherNo}) કાઢી નાખવો છે?`
+      : `Are you sure you want to delete transaction ${txn.voucherNo}?`
     if (confirm(msg)) {
       try {
-        await deleteTransaction(t.id)
+        await deleteTransaction(txn.id)
       } catch (err) {
         alert(err instanceof Error ? err.message : t('general.delete_error'))
       }
@@ -310,7 +310,7 @@ export default function Transactions({ currentUser }: TransactionsProps) {
         okText={saving ? t('general.saving') : t('general.save')}
         cancelText={t('general.cancel')}
         width={560}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ display: 'grid', gap: 14, paddingTop: 8 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>

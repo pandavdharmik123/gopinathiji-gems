@@ -2,7 +2,7 @@ import type React from 'react'
 import { useState } from 'react'
 import { Card, Col, Row, Table, Tag, Typography, Space, Alert, Button, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { TrendingUp, TrendingDown, DollarSign, Wallet, CalendarDays, BookOpen, Clock, CheckCircle, Landmark, Coins, FileText, Lock, EyeOff, ShieldCheck, Smartphone, CreditCard } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, CalendarDays, BookOpen, Clock, CheckCircle, Landmark, Coins, FileText, Lock, EyeOff, Smartphone, CreditCard } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { formatCurrency, todayStr } from '../data/mockData'
 import { getGujaratiTithi } from '../lib/gujaratiCalendar'
@@ -33,7 +33,7 @@ interface StatCardProps {
 function StatCard({ label, value, sub, color, bgColor, iconBg, icon, trend, onClick, isLocked }: StatCardProps) {
   return (
     <Card 
-      bordered={false}
+      variant="borderless"
       onClick={isLocked ? onClick : undefined}
       styles={{ body: { padding: '20px 18px' } }}
       style={{ 
@@ -50,17 +50,17 @@ function StatCard({ label, value, sub, color, bgColor, iconBg, icon, trend, onCl
           <Typography.Text style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: 6, color: color }}>
             {label}
           </Typography.Text>
-          <Typography.Title level={3} style={{ margin: 0, fontWeight: 800, letterSpacing: '-0.02em', color: '#1e293b', fontSize: '1.45rem' }}>
+          <Typography.Title level={2} style={{ margin: 0, fontWeight: 800, letterSpacing: '-0.02em', color: '#1e293b', fontSize: '1.45rem' }}>
             {value}
           </Typography.Title>
           {sub && (
-            <Typography.Text style={{ fontSize: '0.76rem', display: 'block', marginTop: 4, color: `${color}cc`, fontWeight: 500 }}>
+            <Typography.Text style={{ fontSize: '0.76rem', display: 'block', marginTop: 4, color: color, fontWeight: 500 }}>
               {sub}
             </Typography.Text>
           )}
           {trend && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-              <Typography.Text style={{ fontSize: '0.75rem', color: trend.up ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+              <Typography.Text style={{ fontSize: '0.75rem', color: trend.up ? '#15803d' : '#dc2626', fontWeight: 600 }}>
                 {trend.up ? '↑' : '↓'} {trend.value}
               </Typography.Text>
             </div>
@@ -268,7 +268,7 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
       key: 'amount',
       align: 'right',
       render: (v: number, record) => (
-        <span style={{ fontWeight: 700, color: record.type === 'income' ? '#16a34a' : '#dc2626' }}>
+        <span style={{ fontWeight: 700, color: record.type === 'income' ? '#15803d' : '#dc2626' }}>
           {record.type === 'income' ? '+' : '-'}{maskAmount(v, '₹ ')}
         </span>
       ),
@@ -315,7 +315,7 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
         <div>
-          <Typography.Title level={3} style={{ margin: 0, fontWeight: 700, color: 'var(--foreground)' }}>
+          <Typography.Title level={1} style={{ margin: 0, fontWeight: 700, color: 'var(--foreground)', fontSize: '1.5rem' }}>
             {t('nav.dashboard')}
           </Typography.Title>
           <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>
@@ -384,7 +384,7 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
                   showIcon
                   closable
                   onClose={() => handleDismissLargeExpense(exp.id)}
-                  message={`${t('dash.large_expense_alert')} ${exp.description || exp.partyName || (state.language === 'gu' ? 'ખર્ચ' : 'Expense')} — ${maskAmount(exp.amount)}`}
+                  title={`${t('dash.large_expense_alert')} ${exp.description || exp.partyName || (state.language === 'gu' ? 'ખર્ચ' : 'Expense')} — ${maskAmount(exp.amount)}`}
                   style={{ borderRadius: 10 }}
                 />
               ))}
@@ -417,7 +417,7 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
               label={t('dash.total_expense')} 
               value={maskAmount(yearExpense)} 
               sub={`${t('dash.cash_expense')}: ${maskAmount(cashExpense)} | ${t('dash.bank_expense')}: ${maskAmount(bankExpense)}`}
-              color="#ea580c" 
+              color="#c2410c" 
               bgColor="#fff7ed"
               iconBg="#ffffff"
               icon={<TrendingDown size={20} />} 
@@ -429,7 +429,7 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
             <StatCard 
               label={t('dash.net_profit')} 
               value={maskAmount(yearProfit)} 
-              color="#db2777" 
+              color="#be185d" 
               bgColor="#fdf2f8"
               iconBg="#ffffff"
               icon={<DollarSign size={20} />} 
@@ -445,7 +445,7 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
         {/* Cash Account */}
         <Col xs={24} lg={12}>
           <Card
-            bordered={false}
+            variant="borderless"
             title={
               <Space>
                 <Coins size={18} color="#2563eb" />
@@ -462,7 +462,7 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                 <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.cash_income')}</Typography.Text>
-                <Typography.Text style={{ fontWeight: 700, color: '#16a34a' }}>{isUnlocked ? `+${formatCurrency(cashIncome)}` : '+₹ ••••••'}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: '#15803d' }}>{isUnlocked ? `+${formatCurrency(cashIncome)}` : '+₹ ••••••'}</Typography.Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                 <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.cash_expense')}</Typography.Text>
@@ -470,12 +470,12 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                 <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.cash_profit')}</Typography.Text>
-                <Typography.Text style={{ fontWeight: 700, color: cashProfit >= 0 ? '#16a34a' : '#dc2626' }}>{maskAmount(cashProfit)}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: cashProfit >= 0 ? '#15803d' : '#dc2626' }}>{maskAmount(cashProfit)}</Typography.Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#eff6ff', borderRadius: 10, marginTop: 4, border: '1px solid #bfdbfe' }}>
                 <div>
                   <Typography.Text strong style={{ fontSize: '0.9rem', color: '#1e40af', display: 'block' }}>{t('dash.cash_balance')}</Typography.Text>
-                  <Typography.Text style={{ fontSize: '0.72rem', color: '#3b82f6' }}>
+                  <Typography.Text style={{ fontSize: '0.72rem', color: '#1d4ed8' }}>
                     {isUnlocked
                       ? `${formatCurrency(openingCashBalance)} + ${formatCurrency(cashIncome)} - ${formatCurrency(cashExpense)}`
                       : '₹ •••••• + ₹ •••••• - ₹ ••••••'}
@@ -490,14 +490,14 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
         {/* Bank Account */}
         <Col xs={24} lg={12}>
           <Card
-            bordered={false}
+            variant="borderless"
             title={
               <Space>
                 <Landmark size={18} color="#0891b2" />
                 <span style={{ fontWeight: 700, color: '#155e75' }}>{t('dash.bank_overview')}</span>
               </Space>
             }
-            extra={<Tag color="cyan" style={{ fontWeight: 600 }}>{t('dash.bank_balance')}: {maskAmount(bankBalance)}</Tag>}
+            extra={<Tag color="cyan" style={{ fontWeight: 600, color: '#0e7490' }}>{t('dash.bank_balance')}: {maskAmount(bankBalance)}</Tag>}
             style={{ height: '100%', borderRadius: 14, border: '1.5px solid #0891b220', boxShadow: 'none' }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -507,7 +507,7 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                 <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.bank_income')}</Typography.Text>
-                <Typography.Text style={{ fontWeight: 700, color: '#16a34a' }}>{isUnlocked ? `+${formatCurrency(bankIncome)}` : '+₹ ••••••'}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: '#15803d' }}>{isUnlocked ? `+${formatCurrency(bankIncome)}` : '+₹ ••••••'}</Typography.Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                 <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.bank_expense')}</Typography.Text>
@@ -515,12 +515,12 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
                 <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{t('dash.bank_profit')}</Typography.Text>
-                <Typography.Text style={{ fontWeight: 700, color: bankProfit >= 0 ? '#16a34a' : '#dc2626' }}>{maskAmount(bankProfit)}</Typography.Text>
+                <Typography.Text style={{ fontWeight: 700, color: bankProfit >= 0 ? '#15803d' : '#dc2626' }}>{maskAmount(bankProfit)}</Typography.Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#ecfeff', borderRadius: 10, marginTop: 4, border: '1px solid #a5f3fc' }}>
                 <div>
                   <Typography.Text strong style={{ fontSize: '0.9rem', color: '#0e7490', display: 'block' }}>{t('dash.bank_balance')}</Typography.Text>
-                  <Typography.Text style={{ fontSize: '0.72rem', color: '#06b6d4' }}>
+                  <Typography.Text style={{ fontSize: '0.72rem', color: '#0e7490' }}>
                     {isUnlocked
                       ? `${formatCurrency(openingBankBalance)} + ${formatCurrency(bankIncome)} - ${formatCurrency(bankExpense)}`
                       : '₹ •••••• + ₹ •••••• - ₹ ••••••'}
@@ -547,9 +547,9 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { label: state.language === 'gu' ? 'આ મહિનાની આવક' : 'Monthly Income', value: maskAmount(monthIncome), color: '#16a34a' },
+                { label: state.language === 'gu' ? 'આ મહિનાની આવક' : 'Monthly Income', value: maskAmount(monthIncome), color: '#15803d' },
                 { label: state.language === 'gu' ? 'આ મહિનાનો ખર્ચ' : 'Monthly Expense', value: maskAmount(monthExpense), color: '#dc2626' },
-                { label: state.language === 'gu' ? 'મહિનાનો નફો' : 'Monthly Profit', value: maskAmount(monthProfit), color: monthProfit >= 0 ? '#16a34a' : '#dc2626' },
+                { label: state.language === 'gu' ? 'મહિનાનો નફો' : 'Monthly Profit', value: maskAmount(monthProfit), color: monthProfit >= 0 ? '#15803d' : '#dc2626' },
               ].map((item, idx) => (
                 <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: idx !== 2 ? 12 : 0, borderBottom: idx !== 2 ? '1px solid var(--border)' : 'none' }}>
                   <Typography.Text type="secondary" style={{ fontSize: '0.85rem' }}>{item.label}</Typography.Text>

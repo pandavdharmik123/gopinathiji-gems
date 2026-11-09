@@ -83,6 +83,7 @@ export interface CompanySettings {
   dateFormat: string
   language: string
   lastBackup: string
+  expenseCategories?: string
 }
 
 export interface ExpenseCategory {

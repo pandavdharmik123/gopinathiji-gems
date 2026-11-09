@@ -19,7 +19,10 @@ declare global {
 }
 
 // ─── Verify JWT token ─────────────────────────────────────────────────────────
-export function authenticate(req: Request, res: Response, next: NextFunction): void {
+// The token only proves identity at issue time. We re-read the user on every
+// request so role changes and deactivations take effect immediately instead of
+// waiting for the token to expire.
+export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization
   if (!authHeader?.startsWith('Bearer ')) {
     res.status(401).json({ success: false, message: 'Authentication required' })
@@ -27,12 +30,35 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
   }
 
   const token = authHeader.split(' ')[1]
+
+  let payload: JwtPayload
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload
-    req.user = payload
-    next()
+    payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload
   } catch {
     res.status(401).json({ success: false, message: 'Invalid or expired token' })
+    return
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { id: true, username: true, role: true, status: true },
+    })
+
+    if (!user || user.status !== 'active') {
+      res.status(401).json({ success: false, message: 'Account is inactive or no longer exists' })
+      return
+    }
+
+    // Always trust the current database role, never the stale token claim.
+    req.user = {
+      userId: user.id,
+      username: user.username,
+      role: user.role as JwtPayload['role'],
+    }
+    next()
+  } catch (err) {
+    next(err)
   }
 }
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Input, Modal, Select, Table, Tag, Avatar, Typography, Space } from 'antd'
+import { Button, Input, Modal, Select, Table, Tag, Avatar, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { Plus, Search, Pencil } from 'lucide-react'
 import { useApp } from '../store/AppContext'
@@ -199,7 +199,7 @@ export default function Users({ currentUser }: UsersProps) {
         okText={saving ? t('general.saving') : t('general.save')}
         cancelText={t('general.cancel')}
         width={480}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ display: 'grid', gap: 14, paddingTop: 8 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>

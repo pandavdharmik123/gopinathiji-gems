@@ -48,7 +48,7 @@ router.post('/', requireAdmin, validateBody(categorySchema), async (req: Request
       entityId: category.id,
     })
 
-    res.status(211).json({ success: true, data: category })
+    res.status(201).json({ success: true, data: category })
   } catch (err) { next(err) }
 })
 

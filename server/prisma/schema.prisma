@@ -194,3 +194,48 @@ model ExpenseCategory {
 
   @@map("expense_categories")
 }
+
+// ─── Backup ───────────────────────────────────────────────────────────────────
+
+enum BackupStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+enum BackupTrigger {
+  SCHEDULED
+  MANUAL
+  CLI
+}
+
+model BackupRun {
+  id              String        @id @default(cuid())
+  startedAt       DateTime      @default(now())
+  completedAt     DateTime?
+  status          BackupStatus  @default(RUNNING)
+  trigger         BackupTrigger @default(MANUAL)
+  fileSizeBytes   BigInt?
+  checksumSha256  String?
+  driveFileId     String?
+  driveFileName   String?
+  driveFolderId   String?
+  accountEmail    String?
+  encryptionUsed  Boolean       @default(false)
+  errorMessage    String?
+  durationMs      Int?
+
+  @@index([startedAt])
+  @@map("backup_runs")
+}
+
+// ─── Voucher numbering ────────────────────────────────────────────────────────
+// Monotonic per-transaction-type counter. Using a counter (instead of
+// count() + 1) prevents duplicate voucher numbers after deletions and under
+// concurrent creates.
+model VoucherCounter {
+  type       String @id
+  lastNumber Int    @default(0)
+
+  @@map("voucher_counters")
+}

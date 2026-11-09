@@ -268,7 +268,7 @@ export default function CashBook({ currentUser }: CashBookProps) {
         okText={saving ? t('general.saving') : t('general.save')}
         cancelText={t('general.cancel')}
         width={480}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ display: 'grid', gap: 14, paddingTop: 8 }}>
           <div>

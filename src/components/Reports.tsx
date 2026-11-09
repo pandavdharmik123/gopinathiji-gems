@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
 import {
   Select,
-  Input,
   Button,
   Card,
   Row,
@@ -14,8 +13,6 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
-  Printer,
-  Download,
   FileText,
   TrendingUp,
   TrendingDown,
@@ -167,6 +164,17 @@ export default function Reports() {
     if (selectedPaymentMode !== 'all') count++
     return count
   }, [datePreset, search, selectedParty, selectedCategory, selectedPaymentMode])
+
+  // Human-readable range label passed to the PDF generator. Previously the
+  // export button referenced undefined dateFrom/dateTo identifiers and threw.
+  const pdfRangeLabel = useMemo(() => {
+    if (datePreset === 'custom' && customRange?.[0] && customRange?.[1]) {
+      return `${customRange[0].format('YYYY-MM-DD')} ~ ${customRange[1].format('YYYY-MM-DD')}`
+    }
+    if (datePreset === 'today') return todayStr()
+    if (datePreset === 'month') return dayjs().format('YYYY-MM')
+    return undefined
+  }, [datePreset, customRange])
 
 
 
@@ -416,7 +424,7 @@ export default function Reports() {
           <Button
             type="primary"
             icon={<FileText size={15} />}
-            onClick={() => exportComprehensiveReportsPDF(filteredTxns, state.parties, state.settings, selectedYear, datePreset !== 'all' ? `${dateFrom} ~ ${dateTo}` : undefined, state.language === 'gu')}
+            onClick={() => exportComprehensiveReportsPDF(filteredTxns, state.parties, state.settings, selectedYear, pdfRangeLabel, state.language === 'gu')}
             style={{ borderRadius: 8, fontWeight: 600 }}
           >
             {t('reports.print_pdf')}
@@ -436,7 +444,7 @@ export default function Reports() {
 
       {/* ─── Sleek Header Filter Controls ─────────────────────────────────── */}
       <Card
-        bordered={false}
+        variant="borderless"
         style={{
           borderRadius: 16,
           boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
@@ -689,7 +697,7 @@ export default function Reports() {
 
       {/* ─── Filtered Transactions List ────────────────────────────────────────── */}
       <Card
-        bordered={false}
+        variant="borderless"
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Space>
@@ -718,7 +726,7 @@ export default function Reports() {
       {/* ─── Party Outstanding Balances (Filtered Scope) ───────────────────────── */}
       {outstandingData.length > 0 && (
         <Card
-          bordered={false}
+          variant="borderless"
           title={
             <Space>
               <Scale size={18} color="var(--primary)" />

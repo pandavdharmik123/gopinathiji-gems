@@ -96,7 +96,7 @@ export default function Sidebar(props: SidebarProps) {
         placement="left"
         open={props.mobileOpen}
         onClose={props.onMobileClose}
-        width={280}
+        size={280}
         closable={false}
         styles={{ body: { padding: 0, overflow: 'hidden' } }}
       >
@@ -105,5 +105,3 @@ export default function Sidebar(props: SidebarProps) {
     </>
   )
 }
-
-export type { Page }

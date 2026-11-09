@@ -1,9 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express'
 import { prisma } from '../lib/prisma'
-import { authenticate } from '../middleware/auth'
+import { authenticate, requireManager } from '../middleware/auth'
 
 const router = Router()
-router.use(authenticate)
+// Financial reporting is management-only. Employees must not read P&L,
+// ledgers or outstanding balances.
+router.use(authenticate, requireManager)
 
 // ─── Helper: date range ───────────────────────────────────────────────────────
 function monthRange(monthStr: string) {
@@ -207,10 +209,19 @@ router.get('/party/:id', async (req: Request, res: Response, next: NextFunction)
 })
 
 // ─── GET /api/reports/outstanding ────────────────────────────────────────────
-router.get('/outstanding', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/outstanding', async (_req: Request, res: Response, next: NextFunction) => {
   try {
+    const activeYear = await prisma.accountingYear.findFirst({ where: { status: 'active' } })
+
     const parties = await prisma.party.findMany({
-      include: { transactions: { select: { type: true, amount: true } } },
+      include: {
+        transactions: {
+          where: activeYear
+            ? { date: { gte: activeYear.startDate, lte: activeYear.endDate } }
+            : undefined,
+          select: { type: true, amount: true },
+        },
+      },
     })
 
     const outstanding = parties

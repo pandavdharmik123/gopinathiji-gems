@@ -285,7 +285,7 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
         {/* 1. Company Profile & Tax Information */}
         <Col xs={24} lg={12}>
           <Card
-            bordered={false}
+            variant="borderless"
             title={
               <Space>
                 <Building2 size={18} color="var(--primary)" />
@@ -375,7 +375,7 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* System Preferences Card */}
             <Card
-              bordered={false}
+              variant="borderless"
               title={
                 <Space>
                   <SettingsIcon size={18} color="var(--primary)" />
@@ -445,7 +445,7 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
 
             {/* Backup & Restore Center */}
             <Card
-              bordered={false}
+              variant="borderless"
               title={
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                   <Space>
@@ -565,7 +565,7 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
 
       {/* ─── 3. Modern Expense Categories Hub ──────────────────────────────── */}
       <Card
-        bordered={false}
+        variant="borderless"
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
             <Space>
@@ -713,7 +713,7 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
             type="info"
             showIcon
             icon={<ShieldCheck size={16} color="#16a34a" />}
-            message={
+            title={
               <span style={{ fontSize: '0.82rem' }}>
                 {isGu
                   ? 'તમામ પાર્ટીઓ, વ્યવહારો, નાણાકીય વર્ષો, ખર્ચ શ્રેણીઓ અને સેટિંગ્સ સંપૂર્ણ સુરક્ષા સાથે એક્સેલ ફાઇલમાં સાચવવામાં આવશે.'
@@ -918,7 +918,7 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
             type="warning"
             showIcon
             icon={<AlertTriangle size={16} color="#d97706" />}
-            message={
+            title={
               <span style={{ fontSize: '0.8rem' }}>
                 {isGu
                   ? 'આ ક્રિયા દ્વારા ડેટાબેઝમાં તમામ પાર્ટીઓ, વ્યવહારો અને ખાતાઓ આ એક્સેલ ફાઇલ મુજબ પુનઃસ્થાપિત (Restore) થશે.'

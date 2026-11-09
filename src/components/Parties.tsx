@@ -24,11 +24,7 @@ import {
   FileText,
   User as UserIcon,
   Building2,
-  RotateCcw,
-  Sparkles,
-  ArrowUpRight,
-  ArrowDownLeft,
-  Mail
+  RotateCcw
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { PARTY_CATEGORIES, formatCurrency } from '../data/mockData'
@@ -441,7 +437,7 @@ export default function Parties({ currentUser }: PartiesProps) {
 
       {/* ─── Filter Bar Card ──────────────────────────────────────────────── */}
       <Card
-        bordered={false}
+        variant="borderless"
         style={{ borderRadius: 14, border: '1px solid var(--border)' }}
         styles={{ body: { padding: '12px 18px' } }}
       >
@@ -495,7 +491,7 @@ export default function Parties({ currentUser }: PartiesProps) {
 
       {/* ─── Main Parties Table Card ──────────────────────────────────────── */}
       <Card
-        bordered={false}
+        variant="borderless"
         styles={{ body: { padding: 0 } }}
         style={{ borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}
       >
@@ -533,7 +529,7 @@ export default function Parties({ currentUser }: PartiesProps) {
         okText={saving ? t('general.saving') : t('general.save')}
         cancelText={t('general.cancel')}
         width={580}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ display: 'grid', gap: 14, paddingTop: 10 }}>
           {/* Party Name & Category */}

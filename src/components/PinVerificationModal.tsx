@@ -168,7 +168,7 @@ export default function PinVerificationModal({
           padding: '28px 24px',
           boxShadow: '0 20px 40px rgba(15, 89, 92, 0.22)',
         }
-      }}
+      } as any}
     >
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
         <div
@@ -209,7 +209,7 @@ export default function PinVerificationModal({
         <Alert
           type="error"
           showIcon
-          message={errorMsg}
+          title={errorMsg}
           style={{ marginBottom: 18, borderRadius: 10, fontSize: '0.84rem' }}
         />
       )}

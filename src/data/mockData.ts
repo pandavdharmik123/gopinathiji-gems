@@ -1,4 +1,4 @@
-import type { User, Party, Transaction, CashBook, AuditLog, CompanySettings } from '../types'
+import type { User, Party, Transaction, AuditLog, CompanySettings } from '../types'
 
 // ─── Seed Data ────────────────────────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   { id: 't15', voucherNo: 'EXP-008', date: '2026-07-06', type: 'expense', partyId: '', partyName: 'ઓફિસ', category: 'વીજળી', amount: 3200, paymentMode: 'upi', description: 'વીજળી બિલ - જૂન', createdBy: 'નેહા શાહ', createdAt: '2026-07-06 03:00 PM' },
 ]
 
-export const SEED_CASH_BOOK: CashBook[] = [
+export const SEED_CASH_BOOK = [
   { id: 'cb1', date: '2026-07-13', openingBalance: 85000, totalIncome: 75000, totalExpense: 18000, closingBalance: 142000, notes: '', status: 'open' },
   { id: 'cb2', date: '2026-07-12', openingBalance: 95000, totalIncome: 45000, totalExpense: 55000, closingBalance: 85000, notes: 'પગાર + આવક', status: 'closed' },
   { id: 'cb3', date: '2026-07-11', openingBalance: 72000, totalIncome: 28000, totalExpense: 5000, closingBalance: 95000, notes: '', status: 'closed' },
@@ -70,8 +70,10 @@ export const DEFAULT_SETTINGS: CompanySettings = {
 export const EXPENSE_CATEGORIES = ['પગાર', 'હોટલ', 'ટ્રાવેલ', 'વિઝા', 'માર્કેટિંગ', 'ઓફિસ ખર્ચ', 'ભાડું', 'વીજળી', 'ઇન્ટરનેટ', 'અન્ય']
 export const PARTY_CATEGORIES = ['ગ્રાહક', 'સપ્લાયર', 'હોટલ', 'વિઝા', 'ટિકિટ', 'લોજિસ્ટિક', 'બેંક', 'કર્મચારી', 'ટ્રાવેલ', 'અન્ય']
 export const PAYMENT_MODES = [
-  { value: 'cash', label: 'રોકડા' },
-  { value: 'bank', label: 'બેંક ટ્રાન્સફર' },
+  { value: 'cash', label: 'રોકડા / Cash' },
+  { value: 'bank', label: 'બેંક ટ્રાન્સફર / Bank Transfer' },
+  { value: 'upi', label: 'UPI / યુપી' },
+  { value: 'cheque', label: 'Cheque / ચેક' },
 ]
 export const INCOME_CATEGORIES = ['ટ્રાવેલ', 'વિઝા', 'ટિકિટ', 'હોટલ', 'લોજિસ્ટિક', 'કન્સ્લ્ટિંગ', 'અન્ય']
 

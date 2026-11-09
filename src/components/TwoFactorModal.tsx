@@ -18,7 +18,6 @@ export default function TwoFactorModal({
   open,
   onClose,
   onSuccess,
-  currentUser,
   onUserUpdate,
   mode = 'setup',
 }: TwoFactorModalProps) {
@@ -165,7 +164,7 @@ export default function TwoFactorModal({
           padding: '28px 24px',
           boxShadow: '0 20px 40px rgba(15, 89, 92, 0.22)',
         },
-      }}
+      } as any}
     >
       <div style={{ textAlign: 'center', marginBottom: 18 }}>
         <div
@@ -202,7 +201,7 @@ export default function TwoFactorModal({
         <Alert
           type="error"
           showIcon
-          message={errorMsg}
+          title={errorMsg}
           style={{ marginBottom: 18, borderRadius: 10, fontSize: '0.84rem' }}
         />
       )}

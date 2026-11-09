@@ -10,13 +10,25 @@ const router = Router()
 router.use(authenticate)
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
+const isoDate = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+  .refine((value) => {
+    const parsed = new Date(`${value}T00:00:00.000Z`)
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+  }, 'Invalid calendar date')
+
+const moneyAmount = z.number()
+  .positive('Amount must be greater than zero')
+  .max(9_999_999_999_999.99, 'Amount is too large')
+  .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-6, 'Amount may have at most 2 decimal places')
+
 const transactionSchema = z.object({
   voucherNo: z.string().optional(), // auto-generated if omitted
-  date: z.string().min(1),          // ISO date string "YYYY-MM-DD"
+  date: isoDate,                    // strict YYYY-MM-DD calendar date
   type: z.enum(['income', 'expense', 'transfer', 'adjustment']),
   partyId: z.string().optional().nullable(),
   category: z.string().default(''),
-  amount: z.number().positive(),
+  amount: moneyAmount,
   paymentMode: z.enum(['cash', 'bank', 'upi', 'cheque']).default('cash'),
   description: z.string().default(''),
 })
@@ -25,18 +37,45 @@ const querySchema = z.object({
   type: z.enum(['income', 'expense', 'transfer', 'adjustment']).optional(),
   paymentMode: z.enum(['cash', 'bank', 'upi', 'cheque']).optional(),
   partyId: z.string().optional(),
-  dateFrom: z.string().optional(),
-  dateTo: z.string().optional(),
+  dateFrom: isoDate.optional(),
+  dateTo: isoDate.optional(),
   search: z.string().optional(),
-  page: z.coerce.number().default(1),
-  limit: z.coerce.number().default(50),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
 })
 
 // ─── Auto voucher number generator ────────────────────────────────────────────
+// Uses an atomic PostgreSQL upsert against a per-type counter. The initial
+// value is seeded from the highest existing voucher so imports/seeds do not
+// collide, and GREATEST() makes concurrent callers advance monotonically.
 async function nextVoucherNo(type: string): Promise<string> {
   const prefix = type === 'income' ? 'INC' : type === 'expense' ? 'EXP' : type === 'transfer' ? 'TRF' : 'ADJ'
-  const count = await prisma.transaction.count({ where: { type: type as any } })
-  return `${prefix}-${String(count + 1).padStart(3, '0')}`
+
+  const maxRows = await prisma.$queryRaw<Array<{ max: number | null }>>`
+    SELECT MAX(CAST(SUBSTRING("voucherNo" FROM '[0-9]+$') AS INTEGER)) AS max
+    FROM "transactions"
+    WHERE "type" = ${type}::"TransactionType"
+  `
+  const maxExisting = Number(maxRows[0]?.max ?? 0)
+
+  const rows = await prisma.$queryRaw<Array<{ lastNumber: number }>>`
+    INSERT INTO "voucher_counters" ("type", "lastNumber")
+    VALUES (${type}, ${maxExisting + 1})
+    ON CONFLICT ("type") DO UPDATE
+      SET "lastNumber" = GREATEST("voucher_counters"."lastNumber", ${maxExisting}) + 1
+    RETURNING "lastNumber"
+  `
+
+  const next = Number(rows[0]?.lastNumber ?? maxExisting + 1)
+  return `${prefix}-${String(next).padStart(3, '0')}`
+}
+
+async function resolvePartyId(partyId?: string | null): Promise<string | null> {
+  const id = partyId?.trim() ? partyId.trim() : null
+  if (!id) return null
+  const party = await prisma.party.findUnique({ where: { id }, select: { id: true } })
+  if (!party) throw createError('Party not found', 400)
+  return id
 }
 
 // ─── GET /api/transactions ────────────────────────────────────────────────────
@@ -127,15 +166,16 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 router.post('/', validateBody(transactionSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { voucherNo, date, amount, partyId, ...rest } = req.body as z.infer<typeof transactionSchema>
+    const resolvedPartyId = await resolvePartyId(partyId)
     const autoVoucher = voucherNo ?? await nextVoucherNo(rest.type)
 
     const txn = await prisma.transaction.create({
       data: {
         ...rest,
         voucherNo: autoVoucher,
-        date: new Date(date),
+        date: new Date(`${date}T00:00:00.000Z`),
         amount,
-        partyId: partyId ?? null,
+        partyId: resolvedPartyId,
         createdBy: req.user!.username,
       },
       include: { party: { select: { name: true } } },
@@ -158,13 +198,14 @@ router.post('/', validateBody(transactionSchema), async (req: Request, res: Resp
 router.put('/:id', requireManager, validateBody(transactionSchema.partial()), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { date, amount, partyId, ...rest } = req.body as Partial<z.infer<typeof transactionSchema>>
+    const resolvedPartyId = partyId !== undefined ? await resolvePartyId(partyId) : undefined
     const txn = await prisma.transaction.update({
       where: { id: req.params.id },
       data: {
         ...rest,
-        ...(date && { date: new Date(date) }),
+        ...(date && { date: new Date(`${date}T00:00:00.000Z`) }),
         ...(amount !== undefined && { amount }),
-        ...(partyId !== undefined && { partyId: partyId ?? null }),
+        ...(resolvedPartyId !== undefined && { partyId: resolvedPartyId }),
       },
       include: { party: { select: { name: true } } },
     })

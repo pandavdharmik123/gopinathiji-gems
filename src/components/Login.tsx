@@ -201,9 +201,10 @@ export default function Login({ onLogin }: LoginProps) {
   }
 
   return (
-    <div className="login-page">
-      <Card className="login-card" bordered={false}>
-        <Space direction="vertical" size={24} style={{ width: '100%' }}>
+    <main className="login-page">
+      <Card className="login-card" variant="borderless">
+        <Space orientation="vertical" size={24} style={{ width: '100%' }}>
+          <h1 className="sr-only">Gopinathji Gems</h1>
           <div style={{ textAlign: 'center', marginBottom: 8 }}>
             <img
               src={logoOne}
@@ -212,7 +213,7 @@ export default function Login({ onLogin }: LoginProps) {
             />
           </div>
 
-          {error && <Alert type="error" showIcon message={error} style={{ borderRadius: 8 }} />}
+          {error && <Alert type="error" showIcon title={error} style={{ borderRadius: 8 }} />}
 
           {step === 'credentials' ? (
             <Form layout="vertical" onFinish={handleCredentialsSubmit} requiredMark={false}>
@@ -395,7 +396,7 @@ export default function Login({ onLogin }: LoginProps) {
                   type="warning"
                   showIcon
                   icon={<AlertCircle size={16} />}
-                  message={t('2fa.no_email_configured')}
+                  title={t('2fa.no_email_configured')}
                   style={{ borderRadius: 8, fontSize: '0.82rem' }}
                 />
               ) : (
@@ -654,7 +655,7 @@ export default function Login({ onLogin }: LoginProps) {
           )}
         </Space>
       </Card>
-    </div>
+    </main>
   )
 }
 

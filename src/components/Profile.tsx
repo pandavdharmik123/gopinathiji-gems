@@ -8,11 +8,8 @@ import {
   Avatar,
   Tag,
   Typography,
-  Tabs,
   Alert,
   Divider,
-  Space,
-  Badge,
   message
 } from 'antd'
 import {
@@ -22,8 +19,6 @@ import {
   ShieldCheck,
   Calendar,
   KeyRound,
-  CheckCircle2,
-  AlertCircle,
   Save,
   Check,
   UserCheck,
@@ -145,7 +140,7 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
       {/* ─── Profile Header Card ────────────────────────────────────────────── */}
       <Card
-        bordered={false}
+        variant="borderless"
         style={{
           borderRadius: 16,
           marginBottom: 24,
@@ -263,7 +258,7 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
         {/* Left Column: Personal Information */}
         <Col xs={24} md={12}>
           <Card
-            bordered={false}
+            variant="borderless"
             title={
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
                 <div style={{
@@ -297,7 +292,7 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
               <Alert
                 type="success"
                 showIcon
-                message={t('profile.save_success')}
+                title={t('profile.save_success')}
                 style={{ marginBottom: 18, borderRadius: 8 }}
               />
             )}
@@ -305,7 +300,7 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
               <Alert
                 type="error"
                 showIcon
-                message={profileError}
+                title={profileError}
                 style={{ marginBottom: 18, borderRadius: 8 }}
               />
             )}
@@ -403,7 +398,7 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
         {/* Right Column: Change Password */}
         <Col xs={24} md={12}>
           <Card
-            bordered={false}
+            variant="borderless"
             title={
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
                 <div style={{
@@ -437,7 +432,7 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
               <Alert
                 type="success"
                 showIcon
-                message={t('profile.pwd_change_success')}
+                title={t('profile.pwd_change_success')}
                 style={{ marginBottom: 18, borderRadius: 8 }}
               />
             )}
@@ -445,7 +440,7 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
               <Alert
                 type="error"
                 showIcon
-                message={passwordError}
+                title={passwordError}
                 style={{ marginBottom: 18, borderRadius: 8 }}
               />
             )}
@@ -541,7 +536,7 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
 
       {/* ─── PIN Security Management Card ───────────────────────────────────── */}
       <Card
-        bordered={false}
+        variant="borderless"
         style={{
           borderRadius: 16,
           marginTop: 24,
@@ -599,7 +594,7 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
 
       {/* ─── Two-Factor Authentication (2FA) Management Card ─────────────────── */}
       <Card
-        bordered={false}
+        variant="borderless"
         style={{
           borderRadius: 16,
           marginTop: 18,

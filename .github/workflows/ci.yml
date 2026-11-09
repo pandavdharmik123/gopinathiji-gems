@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gopinathji_gems_qa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gopinathji_gems_qa
+      QA_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gopinathji_gems_qa
+      NODE_ENV: test
+      # Electron is only needed for desktop packaging, not for CI tests.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Apply database migrations
+        working-directory: server
+        run: npm run release
+
+      - name: Verify existing-database baseline upgrade path
+        working-directory: server
+        env:
+          BASELINE_DB_URL: postgresql://postgres:postgres@localhost:5432/gopinathji_gems_baseline_test
+        run: |
+          psql postgresql://postgres:postgres@localhost:5432/postgres -c 'CREATE DATABASE gopinathji_gems_baseline_test'
+          # Simulate production: schema exists, but there is no migration history.
+          psql "$BASELINE_DB_URL" -v ON_ERROR_STOP=1 -q -f prisma/migrations/20261110000000_baseline/migration.sql
+          DATABASE_URL="$BASELINE_DB_URL" npx prisma migrate resolve --applied 20261110000000_baseline
+          DATABASE_URL="$BASELINE_DB_URL" npx prisma migrate deploy
+          psql "$BASELINE_DB_URL" -v ON_ERROR_STOP=1 -c "SELECT to_regclass('public.backup_runs') AS backup_runs, to_regclass('public.voucher_counters') AS voucher_counters"
+          psql postgresql://postgres:postgres@localhost:5432/postgres -c 'DROP DATABASE gopinathji_gems_baseline_test'
+
+      - name: Seed isolated QA database
+        working-directory: server
+        run: npx ts-node --transpile-only qa/seed-qa.ts
+
+      - name: Type-check server
+        working-directory: server
+        run: npx tsc --noEmit
+
+      - name: API tests
+        working-directory: server
+        run: npx vitest run qa/api.test.ts
+
+      - name: Server dependency audit (high/critical)
+        working-directory: server
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Type-check frontend
+        run: npx tsc --noEmit
+
+      - name: Frontend unit tests
+        run: npx vitest run --config qa/vitest.config.ts
+
+      - name: Production build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Re-seed QA database for E2E
+        working-directory: server
+        run: npx ts-node --transpile-only qa/seed-qa.ts
+
+      - name: E2E tests
+        run: npx playwright test --config qa/playwright.config.ts
+
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            qa/test-results
+            qa/e2e-results.json
+          retention-days: 7
+          if-no-files-found: ignore
