@@ -5,6 +5,7 @@ import { FileText, X, BookOpen } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { formatCurrency } from '../data/mockData'
 import { exportPartyLedgerPDF } from '../lib/pdfReportGenerator'
+import { formatDisplayDate } from '../lib/dateFormat'
 import dayjs from 'dayjs'
 
 interface LedgerRow {
@@ -37,35 +38,26 @@ export default function Ledger() {
   // Filter party transactions
   const partyTxns = yearTxns.filter(t => t.partyId === selectedPartyId)
 
-  // Calculate opening balance for the ledger range
-  const getOpeningBalanceForRange = (): number => {
-    if (!selectedYear || !party) return 0
-    let bal = selectedYear.openingBalance // Or party base opening balance if available
-    
-    // Sum transactions before the range start date
-    if (dateFrom) {
-      const priorTxns = partyTxns.filter(t => t.date < dateFrom)
-      const credit = priorTxns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-      const debit = priorTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-      bal += credit - debit
-    }
-    return bal
-  }
-  const rangeOpeningBalance = getOpeningBalanceForRange()
+  // Running balance resets with the visible filter range. It must not include
+  // the company's opening cash balance or hidden prior rows, otherwise the
+  // last running balance will not match Credit − Debit for the period.
+  const rangeOpeningBalance = 0
+
+  // Transactions visible under the current date filters (also used by PDF).
+  const rangedPartyTxns = partyTxns
+    .filter(t => {
+      const matchFrom = dateFrom ? t.date >= dateFrom : true
+      const matchTo = dateTo ? t.date <= dateTo : true
+      return matchFrom && matchTo
+    })
+    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt))
 
   // Generate Ledger rows
   const getLedgerRows = (): LedgerRow[] => {
     const list: LedgerRow[] = []
     let runningBalance = rangeOpeningBalance
 
-    // Filter within range date bounds
-    const rangedTxns = partyTxns.filter(t => {
-      const matchFrom = dateFrom ? t.date >= dateFrom : true
-      const matchTo = dateTo ? t.date <= dateTo : true
-      return matchFrom && matchTo
-    }).sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt))
-
-    for (const t of rangedTxns) {
+    for (const t of rangedPartyTxns) {
       const isCredit = t.type === 'income'
       const credit = isCredit ? t.amount : 0
       const debit = !isCredit ? t.amount : 0
@@ -91,6 +83,7 @@ export default function Ledger() {
   const totalCredit = ledgerRows.reduce((s, r) => s + r.credit, 0)
   const totalDebit = ledgerRows.reduce((s, r) => s + r.debit, 0)
   const netBalance = totalCredit - totalDebit
+  const closingBalance = ledgerRows.length > 0 ? ledgerRows[ledgerRows.length - 1].balance : rangeOpeningBalance
 
   const columns: ColumnsType<LedgerRow> = [
     {
@@ -105,7 +98,7 @@ export default function Ledger() {
       dataIndex: 'date',
       key: 'date',
       width: 120,
-      render: (v: string) => <span style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{v}</span>,
+      render: (v: string) => <span style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{formatDisplayDate(v)}</span>,
     },
     {
       title: t('general.description'),
@@ -155,14 +148,14 @@ export default function Ledger() {
           <h1 className="section-title">{t('ledger.title')}</h1>
           {selectedYear && (
             <Typography.Text type="secondary" style={{ fontSize: '0.82rem' }}>
-              {selectedYear.name} ({selectedYear.startDate} {state.language === 'gu' ? 'થી' : 'to'} {selectedYear.endDate})
+              {selectedYear.name} ({formatDisplayDate(selectedYear.startDate)} {state.language === 'gu' ? 'થી' : 'to'} {formatDisplayDate(selectedYear.endDate)})
             </Typography.Text>
           )}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Button
             icon={<FileText size={14} />}
-            onClick={() => party && exportPartyLedgerPDF(party, yearTxns, state.settings, selectedYear, state.language === 'gu')}
+            onClick={() => party && exportPartyLedgerPDF(party, rangedPartyTxns, state.settings, selectedYear, state.language === 'gu')}
             disabled={!party}
             style={{ fontWeight: 600 }}
           >
@@ -185,7 +178,7 @@ export default function Ledger() {
             label: `${p.name} (${p.category})`
           }))}
         />
-        <DatePicker
+        <DatePicker format="DD-MM-YYYY"
           placeholder={state.language === 'gu' ? 'શરૂઆત' : 'Start'}
           style={{ width: 150 }}
           value={dateFrom ? dayjs(dateFrom) : null}
@@ -197,7 +190,7 @@ export default function Ledger() {
             return current && (current.isBefore(start, 'day') || current.isAfter(end, 'day'))
           }}
         />
-        <DatePicker
+        <DatePicker format="DD-MM-YYYY"
           placeholder={state.language === 'gu' ? 'અંત' : 'End'}
           style={{ width: 150 }}
           value={dateTo ? dayjs(dateTo) : null}
@@ -254,7 +247,13 @@ export default function Ledger() {
               dataSource={ledgerRows}
               rowKey="id"
               size="middle"
-              pagination={false}
+              pagination={{
+                defaultPageSize: 15,
+                showSizeChanger: true,
+                pageSizeOptions: ['15', '30', '50', '100'],
+                showTotal: (total) => `${t('general.total')} ${total} ${t('general.records')}`,
+                style: { margin: '12px 16px' }
+              }}
               locale={{ emptyText: t('general.no_data') }}
               scroll={{ x: 'max-content' }}
               summary={() => {
@@ -272,7 +271,7 @@ export default function Ledger() {
                         <span style={{ fontWeight: 700, color: '#dc2626' }}>{formatCurrency(totalDebit)}</span>
                       </Table.Summary.Cell>
                       <Table.Summary.Cell index={3} align="right">
-                        <span style={{ fontWeight: 700, color: netBalance >= 0 ? 'var(--primary)' : '#dc2626' }}>{formatCurrency(netBalance)}</span>
+                        <span style={{ fontWeight: 700, color: closingBalance >= 0 ? 'var(--primary)' : '#dc2626' }}>{formatCurrency(closingBalance)}</span>
                       </Table.Summary.Cell>
                     </Table.Summary.Row>
                   </Table.Summary>

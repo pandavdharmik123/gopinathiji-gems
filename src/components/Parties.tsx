@@ -9,7 +9,6 @@ import {
   Space,
   Typography,
   Table,
-  Popconfirm,
   Tooltip
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -31,6 +30,8 @@ import { PARTY_CATEGORIES, formatCurrency } from '../data/mockData'
 import { exportPartiesPDF } from '../lib/pdfReportGenerator'
 import type { Party, User as UserType } from '../types'
 import TransliteratedInput from './TransliteratedInput'
+import { useToast } from './Toast'
+import { useConfirm } from './ConfirmDialog'
 
 interface PartiesProps {
   currentUser: UserType
@@ -50,6 +51,8 @@ const emptyForm: Omit<Party, 'id' | 'balance' | 'createdAt'> = {
 
 export default function Parties({ currentUser }: PartiesProps) {
   const { state, createParty, updateParty, t } = useApp()
+  const toast = useToast()
+  const confirm = useConfirm()
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ ...emptyForm })
   const [search, setSearch] = useState('')
@@ -101,6 +104,7 @@ export default function Parties({ currentUser }: PartiesProps) {
 
   const handleSave = async () => {
     if (!form.name.trim()) return
+    const isGu = state.language === 'gu'
     setSaving(true)
     try {
       if (editId) {
@@ -108,11 +112,20 @@ export default function Parties({ currentUser }: PartiesProps) {
       } else {
         await createParty(form)
       }
+      toast.success(
+        editId
+          ? isGu ? 'પાર્ટી અપડેટ થઈ' : 'Party updated'
+          : isGu ? 'પાર્ટી ઉમેરાઈ' : 'Party created',
+        form.name
+      )
       setShowModal(false)
       setForm({ ...emptyForm })
       setEditId(null)
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('general.save_error'))
+      toast.error(
+        isGu ? 'પાર્ટી સાચવી શકાઈ નથી' : 'Could not save party',
+        err instanceof Error ? err.message : undefined
+      )
     } finally {
       setSaving(false)
     }
@@ -136,10 +149,34 @@ export default function Parties({ currentUser }: PartiesProps) {
 
   const handleToggleStatus = async (p: Party) => {
     if (currentUser.role !== 'admin') return
+    const isGu = state.language === 'gu'
+    const nextStatus = p.status === 'active' ? 'inactive' : 'active'
+    const ok = await confirm({
+      title:
+        nextStatus === 'active'
+          ? isGu ? 'પાર્ટી સક્રિય કરવી?' : 'Activate this party?'
+          : isGu ? 'પાર્ટી નિષ્ક્રિય કરવી?' : 'Deactivate this party?',
+      description: p.name,
+      confirmText: nextStatus === 'active' ? (isGu ? 'સક્રિય કરો' : 'Activate') : (isGu ? 'નિષ્ક્રિય કરો' : 'Deactivate'),
+      cancelText: isGu ? 'રદ કરો' : 'Cancel',
+      tone: nextStatus === 'active' ? 'primary' : 'danger',
+      icon: nextStatus === 'active' ? 'question' : 'alert',
+    })
+    if (!ok) return
+
     try {
-      await updateParty(p.id, { status: p.status === 'active' ? 'inactive' : 'active' })
+      await updateParty(p.id, { status: nextStatus })
+      toast.success(
+        nextStatus === 'active'
+          ? isGu ? 'પાર્ટી સક્રિય કરી' : 'Party activated'
+          : isGu ? 'પાર્ટી નિષ્ક્રિય કરી' : 'Party deactivated',
+        p.name
+      )
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('general.save_error'))
+      toast.error(
+        isGu ? 'પાર્ટીની સ્થિતિ બદલી શકાઈ નથી' : 'Could not change party status',
+        err instanceof Error ? err.message : undefined
+      )
     }
   }
 
@@ -304,21 +341,16 @@ export default function Parties({ currentUser }: PartiesProps) {
             />
           </Tooltip>
           {currentUser.role === 'admin' && (
-            <Popconfirm
-              title={p.status === 'active' ? (isGu ? 'શું તમે આ પાર્ટીને નિષ્ક્રિય કરવા માંગો છો?' : 'Deactivate this party?') : (isGu ? 'શું તમે આ પાર્ટીને સક્રિય કરવા માંગો છો?' : 'Activate this party?')}
-              onConfirm={() => handleToggleStatus(p)}
-              okText={t('general.save')}
-              cancelText={t('general.cancel')}
-            >
-              <Tooltip title={p.status === 'active' ? t('parties.deactivate') : t('parties.activate')}>
-                <Button
-                  type="text"
-                  danger={p.status === 'active'}
-                  icon={p.status === 'active' ? <X size={15} /> : <Check size={15} color="#16a34a" />}
-                  style={{ borderRadius: 6, width: 32, height: 32, padding: 0 }}
-                />
-              </Tooltip>
-            </Popconfirm>
+            <Tooltip title={p.status === 'active' ? t('parties.deactivate') : t('parties.activate')}>
+              <Button
+                type="text"
+                danger={p.status === 'active'}
+                icon={p.status === 'active' ? <X size={15} /> : <Check size={15} color="#16a34a" />}
+                aria-label={p.status === 'active' ? t('parties.deactivate') : t('parties.activate')}
+                onClick={() => handleToggleStatus(p)}
+                style={{ borderRadius: 6, width: 32, height: 32, padding: 0 }}
+              />
+            </Tooltip>
           )}
         </Space>
       )
@@ -501,7 +533,7 @@ export default function Parties({ currentUser }: PartiesProps) {
           rowKey="id"
           size="middle"
           pagination={{
-            pageSize: 15,
+            defaultPageSize: 15,
             showSizeChanger: true,
             pageSizeOptions: ['15', '30', '50', '100'],
             style: { margin: '16px 20px' },

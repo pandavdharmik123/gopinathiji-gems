@@ -1,13 +1,16 @@
 import { useState } from 'react'
-import { Input, Select, Tag, Card, Typography } from 'antd'
+import { Input, Select, Tag, Card, Typography, Pagination } from 'antd'
 import { Search, Clock, Plus, Trash2, BookOpen, Building2, RotateCw, Settings, FileText } from 'lucide-react'
 import { useApp } from '../store/AppContext'
+import { formatDisplayDateTime } from '../lib/dateFormat'
 
 export default function AuditLog() {
   const { state, t } = useApp()
   const [search, setSearch] = useState('')
   const [filterEntity, setFilterEntity] = useState('')
   const [filterUser, setFilterUser] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(15)
 
   const entities = [...new Set(state.auditLogs.map(l => l.entity))]
   const users = [...new Set(state.auditLogs.map(l => l.user))]
@@ -23,6 +26,10 @@ export default function AuditLog() {
     const matchUser = filterUser ? log.user === filterUser : true
     return matchSearch && matchEntity && matchUser
   })
+
+  const maxPage = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const currentPage = Math.min(page, maxPage)
+  const pagedLogs = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   const actionColor: Record<string, string> = {
     'ઉમેર્યો': 'success',
@@ -129,7 +136,7 @@ export default function AuditLog() {
             <p style={{ margin: 0, color: 'var(--secondary)' }}>{t('general.no_data')}</p>
           </Card>
         )}
-        {filtered.map(log => (
+        {pagedLogs.map(log => (
           <Card
             key={log.id}
             styles={{ body: { padding: '14px 20px' } }}
@@ -157,7 +164,7 @@ export default function AuditLog() {
                 <p style={{ margin: '0 0 4px', fontSize: '0.85rem', color: 'var(--foreground)' }}>{log.details}</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--secondary)', fontSize: '0.75rem' }}>
                   <Clock size={12} />
-                  <span>{log.timestamp}</span>
+                  <span>{formatDisplayDateTime(log.timestamp)}</span>
                 </div>
               </div>
 
@@ -170,6 +177,23 @@ export default function AuditLog() {
           </Card>
         ))}
       </div>
+
+      {filtered.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+          <Pagination
+            current={currentPage}
+            pageSize={pageSize}
+            total={filtered.length}
+            showSizeChanger
+            pageSizeOptions={['15', '30', '50', '100']}
+            showTotal={(total) => `${t('general.total')} ${total} ${t('general.records')}`}
+            onChange={(nextPage, nextSize) => {
+              setPage(nextSize !== pageSize ? 1 : nextPage)
+              setPageSize(nextSize)
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }

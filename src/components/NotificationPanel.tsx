@@ -1,6 +1,8 @@
 import { Drawer, Button, Badge, List, Typography, Space } from 'antd'
 import { Bell, CheckCircle, AlertTriangle, Info, XCircle, X } from 'lucide-react'
 import { useApp } from '../store/AppContext'
+import { formatDisplayDateTime } from '../lib/dateFormat'
+import { useToast } from './Toast'
 
 interface NotificationPanelProps {
   open: boolean
@@ -27,6 +29,7 @@ const typeColor: Record<string, string> = {
 
 export default function NotificationPanel({ open, onClose }: NotificationPanelProps) {
   const { state, markNotificationRead, clearNotifications, t } = useApp()
+  const toast = useToast()
   const notifications = state.notifications
 
   const unread = notifications.filter(n => !n.read).length
@@ -63,7 +66,10 @@ export default function NotificationPanel({ open, onClose }: NotificationPanelPr
             <Button
               type="text"
               size="small"
-              onClick={() => void clearNotifications()}
+              onClick={async () => {
+                await clearNotifications()
+                toast.success(state.language === 'gu' ? 'બધી સૂચનાઓ સાફ કરી' : 'All notifications cleared')
+              }}
               style={{ color: 'rgba(255,255,255,0.8)', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)' }}
             >
               {t('notif.clear_all')}
@@ -118,7 +124,7 @@ export default function NotificationPanel({ open, onClose }: NotificationPanelPr
                     {translateNotif(n.message)}
                   </Typography.Text>
                   <Typography.Text style={{ display: 'block', fontSize: '0.72rem', color: 'var(--secondary)', marginTop: 4 }}>
-                    {n.createdAt}
+                    {formatDisplayDateTime(n.createdAt)}
                   </Typography.Text>
                 </div>
                 {!n.read && (

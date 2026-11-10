@@ -8,6 +8,9 @@ import { exportExpensePDF } from '../lib/pdfReportGenerator'
 import type { Transaction, User } from '../types'
 import dayjs from 'dayjs'
 import TransliteratedInput from './TransliteratedInput'
+import { formatDisplayDate } from '../lib/dateFormat'
+import { useToast } from './Toast'
+import { useConfirm } from './ConfirmDialog'
 
 interface ExpenseProps { currentUser: User }
 
@@ -15,11 +18,13 @@ const emptyForm = { date: todayStr(), partyId: '', category: '', amount: '', pay
 
 export default function Expense({ currentUser }: ExpenseProps) {
   const { state, createTransaction, updateTransaction, deleteTransaction, t } = useApp()
-  
+  const toast = useToast()
+  const confirm = useConfirm()
+
   const categoriesList = state.expenseCategories.map(c => c.name)
 
   const selectedYear = state.accountingYears.find(y => y.id === state.selectedYearId)
-  
+
   // Filter expense list to selected year
   const expenseList = state.transactions
     .filter(t => t.type === 'expense')
@@ -49,12 +54,16 @@ export default function Expense({ currentUser }: ExpenseProps) {
   })
 
   const handleSave = async () => {
-    if (!form.amount || !form.date || !form.category) return
+    if (!form.amount || !form.date) return
+    const isGu = state.language === 'gu'
 
     // Validate date falls within selected accounting year
     if (selectedYear) {
       if (form.date < selectedYear.startDate || form.date > selectedYear.endDate) {
-        alert(`${t('general.date_validation_error')} (${selectedYear.startDate} - ${selectedYear.endDate})`)
+        toast.warning(
+          t('general.date_validation_error'),
+          `${formatDisplayDate(selectedYear.startDate)} – ${formatDisplayDate(selectedYear.endDate)}`
+        )
         return
       }
     }
@@ -70,16 +79,25 @@ export default function Expense({ currentUser }: ExpenseProps) {
         paymentMode: form.paymentMode as Transaction['paymentMode'],
         description: form.description,
       }
-      if (editId) {
-        await updateTransaction(editId, payload)
-      } else {
-        await createTransaction(payload)
-      }
+      const saved = editId
+        ? await updateTransaction(editId, payload)
+        : await createTransaction(payload)
+
+      toast.success(
+        editId
+          ? isGu ? 'ખર્ચ અપડેટ થયો' : 'Expense updated'
+          : isGu ? 'ખર્ચ સાચવ્યો' : 'Expense recorded',
+        `${saved.voucherNo} · ${formatCurrency(saved.amount)}`
+      )
+
       setShowModal(false)
       setForm({ ...emptyForm })
       setEditId(null)
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('general.save_error'))
+      toast.error(
+        isGu ? 'ખર્ચ સાચવી શકાયો નથી' : 'Could not save expense',
+        err instanceof Error ? err.message : undefined
+      )
     } finally {
       setSaving(false)
     }
@@ -93,15 +111,24 @@ export default function Expense({ currentUser }: ExpenseProps) {
 
   const handleDelete = async (txn: Transaction) => {
     if (currentUser.role !== 'admin') return
-    const msg = state.language === 'gu'
-      ? `શું આ ખર્ચ (${txn.voucherNo} — ${formatCurrency(txn.amount)}) કાઢી નાખવો છે?`
-      : `Are you sure you want to delete this expense (${txn.voucherNo} — ${formatCurrency(txn.amount)})?`
-    if (confirm(msg)) {
-      try {
-        await deleteTransaction(txn.id)
-      } catch (err) {
-        alert(err instanceof Error ? err.message : t('general.delete_error'))
-      }
+    const isGu = state.language === 'gu'
+    const ok = await confirm({
+      title: isGu ? 'આ ખર્ચ કાઢી નાખવો?' : 'Delete this expense entry?',
+      description: `${txn.voucherNo} · ${formatCurrency(txn.amount)}`,
+      confirmText: isGu ? 'કાઢી નાખો' : 'Delete',
+      cancelText: isGu ? 'રદ કરો' : 'Cancel',
+      tone: 'danger',
+    })
+    if (!ok) return
+
+    try {
+      await deleteTransaction(txn.id)
+      toast.success(isGu ? 'ખર્ચ કાઢી નાખ્યો' : 'Expense deleted', txn.voucherNo)
+    } catch (err) {
+      toast.error(
+        isGu ? 'ખર્ચ કાઢી શકાયો નથી' : 'Could not delete expense',
+        err instanceof Error ? err.message : undefined
+      )
     }
   }
 
@@ -123,7 +150,7 @@ export default function Expense({ currentUser }: ExpenseProps) {
       title: t('general.date'),
       dataIndex: 'date',
       key: 'date',
-      render: (v: string) => <span style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{v}</span>,
+      render: (v: string) => <span style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{formatDisplayDate(v)}</span>,
     },
     {
       title: state.language === 'gu' ? 'ખર્ચ પ્રકાર' : 'Expense Category',
@@ -201,7 +228,7 @@ export default function Expense({ currentUser }: ExpenseProps) {
             onChange={v => setFilterCategory(v || '')}
             options={categoriesList.map(c => ({ value: c, label: c }))}
           />
-          <DatePicker
+          <DatePicker format="DD-MM-YYYY"
             placeholder={state.language === 'gu' ? 'તારીખ પસંદ કરો' : 'Select Date'}
             style={{ width: 160 }}
             value={filterDate ? dayjs(filterDate) : null}
@@ -254,7 +281,7 @@ export default function Expense({ currentUser }: ExpenseProps) {
           dataSource={filtered}
           rowKey="id"
           size="middle"
-          pagination={{ pageSize: 15, showSizeChanger: false, showTotal: (total) => `${t('general.total')} ${total} ${t('general.records')}` }}
+          pagination={{ defaultPageSize: 15, showSizeChanger: true, pageSizeOptions: ['15', '30', '50', '100'], showTotal: (total) => `${t('general.total')} ${total} ${t('general.records')}` }}
           locale={{ emptyText: t('general.no_data') }}
           scroll={{ x: 'max-content', y: 'calc(100vh - 280px)' }}
         />
@@ -275,8 +302,8 @@ export default function Expense({ currentUser }: ExpenseProps) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>{t('general.date')} *</label>
-              <DatePicker 
-                value={form.date ? dayjs(form.date) : null} 
+              <DatePicker format="DD-MM-YYYY"
+                value={form.date ? dayjs(form.date) : null}
                 onChange={(date) => setForm(f => ({ ...f, date: date ? date.format('YYYY-MM-DD') : '' }))}
                 disabledDate={(current) => {
                   if (!selectedYear) return false
@@ -288,12 +315,13 @@ export default function Expense({ currentUser }: ExpenseProps) {
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>{t('general.category')} *</label>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>{t('general.category')}</label>
               <Select
                 style={{ width: '100%' }}
                 value={form.category || undefined}
                 placeholder={`-- ${t('general.category')} --`}
-                onChange={v => setForm(f => ({ ...f, category: v }))}
+                allowClear
+                onChange={v => setForm(f => ({ ...f, category: v || '' }))}
                 options={categoriesList.map(c => ({ value: c, label: c }))}
               />
             </div>

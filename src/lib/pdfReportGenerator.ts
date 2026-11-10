@@ -1,5 +1,6 @@
 import type { CompanySettings, AccountingYear, Transaction, Party } from '../types'
 import { formatCurrency } from '../data/mockData'
+import { formatDisplayDate } from './dateFormat'
 import logoTwo from '../assets/logoTwo.png'
 
 export interface ReportKPICard {
@@ -59,11 +60,7 @@ export function printPDFReport(options: PDFReportOptions) {
   const reportPeriod = period || (year ? year.name : '')
 
   const now = new Date()
-  const generatedDateStr = now.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  })
+  const generatedDateStr = formatDisplayDate(now)
   const generatedTimeStr = now.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
@@ -411,7 +408,7 @@ export function exportTransactionsPDF(
 
   const rows = transactions.map((t, idx) => [
     idx + 1,
-    t.date,
+    formatDisplayDate(t.date),
     t.voucherNo,
     t.type === 'income' ? (isGu ? 'આવક' : 'Income') : (isGu ? 'ખર્ચ' : 'Expense'),
     t.partyName || '—',
@@ -499,7 +496,7 @@ export function exportIncomePDF(
 
   const rows = incomeTxns.map((t, idx) => [
     idx + 1,
-    t.date,
+    formatDisplayDate(t.date),
     t.voucherNo,
     t.partyName || '—',
     t.category || '—',
@@ -584,7 +581,7 @@ export function exportExpensePDF(
 
   const rows = expenseTxns.map((t, idx) => [
     idx + 1,
-    t.date,
+    formatDisplayDate(t.date),
     t.voucherNo,
     t.partyName || '—',
     t.category || 'General',
@@ -771,7 +768,7 @@ export function exportPartyLedgerPDF(
 
     return [
       idx + 1,
-      t.date,
+      formatDisplayDate(t.date),
       t.voucherNo,
       t.category || '—',
       t.description || '—',
@@ -856,8 +853,8 @@ export function exportCashBookPDF(
   const rows = years.map((y, idx) => [
     idx + 1,
     y.name,
-    y.startDate,
-    y.endDate,
+    formatDisplayDate(y.startDate),
+    formatDisplayDate(y.endDate),
     formatCurrency(y.openingBalance),
     formatCurrency(y.openingBankBalance || 0),
     y.id === activeYear?.id ? (isGu ? '🟢 સક્રિય (Active)' : '🟢 Active') : (isGu ? 'સામાન્ય' : 'Standard'),
@@ -937,7 +934,7 @@ export function exportComprehensiveReportsPDF(
 
   const txnRows = transactions.map((t, idx) => [
     idx + 1,
-    t.date,
+    formatDisplayDate(t.date),
     t.voucherNo,
     t.type === 'income' ? (isGu ? 'આવક' : 'Income') : (isGu ? 'ખર્ચ' : 'Expense'),
     t.partyName || '—',
@@ -1029,7 +1026,7 @@ export function exportDashboardPDF(
 ) {
   const rows = recentTxns.map((t, idx) => [
     idx + 1,
-    t.date,
+    formatDisplayDate(t.date),
     t.voucherNo,
     t.type === 'income' ? (isGu ? 'આવક' : 'Income') : (isGu ? 'ખર્ચ' : 'Expense'),
     t.partyName || '—',

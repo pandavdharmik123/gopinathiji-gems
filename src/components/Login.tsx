@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Form, Input, Space, Tag, Typography, message } from 'antd'
+import { Alert, Button, Card, Form, Input, Space, Tag, Typography } from 'antd'
 import {
   Lock,
   UserRound,
@@ -15,6 +15,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { User } from '../types'
 import { api, ApiError } from '../lib/api'
 import { useApp } from '../store/AppContext'
+import { useToast } from './Toast'
 import logoOne from '../assets/logoOne.png'
 
 interface LoginProps {
@@ -23,6 +24,7 @@ interface LoginProps {
 
 export default function Login({ onLogin }: LoginProps) {
   const { t } = useApp()
+  const toast = useToast()
   const [step, setStep] = useState<'credentials' | '2fa'>('credentials')
   const [twoFactorMode, setTwoFactorMode] = useState<'authenticator' | 'email' | 'choose_method'>('authenticator')
   const [tempToken, setTempToken] = useState('')
@@ -138,7 +140,7 @@ export default function Login({ onLogin }: LoginProps) {
       if (res.maskedEmail) {
         setMaskedEmail(res.maskedEmail)
       }
-      message.success(t('2fa.otp_sent_success'))
+      toast.success(t('2fa.otp_sent_success'))
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Failed to send verification email'
       setError(msg)

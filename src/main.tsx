@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client'
 import { ConfigProvider } from 'antd'
 import 'antd/dist/reset.css'
 import App from './App'
+import { ToastProvider } from './components/Toast'
+import { ConfirmProvider } from './components/ConfirmDialog'
 import './index.css'
 
 // Intercept and silence verbose library logs from @ai4bharat/indic-transliterate
@@ -124,7 +126,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         },
       }}
     >
-      <App />
+      <ToastProvider>
+        <ConfirmProvider>
+          <App />
+        </ConfirmProvider>
+      </ToastProvider>
     </ConfigProvider>
   </React.StrictMode>,
 )

@@ -20,9 +20,8 @@ describe('currency formatting', () => {
 })
 
 describe('date helpers', () => {
-  it('formats an ISO date as a Gujarati-locale date', () => {
-    // Date-only strings are parsed as UTC midnight; the display locale is gu-IN.
-    expect(formatDate('2026-04-15')).toMatch(/^\d{2}\/\d{2}\/\d{4}$/)
+  it('formats an ISO date as DD-MM-YYYY', () => {
+    expect(formatDate('2026-04-15')).toBe('15-04-2026')
   })
 
   it('todayStr produces a sortable YYYY-MM-DD value', () => {

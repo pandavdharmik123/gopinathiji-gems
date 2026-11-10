@@ -9,8 +9,7 @@ import {
   Tag,
   Typography,
   Alert,
-  Divider,
-  message
+  Divider
 } from 'antd'
 import {
   User as UserIcon,
@@ -26,11 +25,13 @@ import {
   Smartphone
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
+import { useToast } from './Toast'
 import { api, ApiError } from '../lib/api'
 import type { User } from '../types'
 import TransliteratedInput from './TransliteratedInput'
 import PinVerificationModal from './PinVerificationModal'
 import TwoFactorModal from './TwoFactorModal'
+import { formatDisplayDate } from '../lib/dateFormat'
 
 interface ProfileProps {
   currentUser: User
@@ -39,6 +40,7 @@ interface ProfileProps {
 
 export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
   const { state, t } = useApp()
+  const toast = useToast()
   const isGu = state.language === 'gu'
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinModalMode, setPinModalMode] = useState<'setup' | 'reset'>('setup')
@@ -80,12 +82,12 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
       })
       onUserUpdate(updatedUser)
       setProfileSuccess(true)
-      message.success(t('profile.save_success'))
+      toast.success(t('profile.save_success'))
       setTimeout(() => setProfileSuccess(false), 4000)
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t('general.save_error')
       setProfileError(msg)
-      message.error(msg)
+      toast.error(msg)
     } finally {
       setProfileSaving(false)
     }
@@ -117,12 +119,12 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
-      message.success(t('profile.pwd_change_success'))
+      toast.success(t('profile.pwd_change_success'))
       setTimeout(() => setPasswordSuccess(false), 5000)
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t('profile.pwd_change_error')
       setPasswordError(msg)
-      message.error(msg)
+      toast.error(msg)
     } finally {
       setPasswordSaving(false)
     }
@@ -246,7 +248,7 @@ export default function Profile({ currentUser, onUserUpdate }: ProfileProps) {
               )}
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Calendar size={15} style={{ opacity: 0.8 }} />
-                {isGu ? 'ખાતું બન્યું' : 'Joined'}: {currentUser.createdAt || '2026-08-01'}
+                {isGu ? 'ખાતું બન્યું' : 'Joined'}: {formatDisplayDate(currentUser.createdAt || '2026-08-01')}
               </span>
             </div>
           </Col>

@@ -8,6 +8,9 @@ import { exportIncomePDF } from '../lib/pdfReportGenerator'
 import type { Transaction, User } from '../types'
 import dayjs from 'dayjs'
 import TransliteratedInput from './TransliteratedInput'
+import { formatDisplayDate } from '../lib/dateFormat'
+import { useToast } from './Toast'
+import { useConfirm } from './ConfirmDialog'
 
 interface IncomeProps { currentUser: User }
 
@@ -15,6 +18,8 @@ const emptyForm = { date: todayStr(), partyId: '', category: '', amount: '', pay
 
 export default function Income({ currentUser }: IncomeProps) {
   const { state, createTransaction, updateTransaction, deleteTransaction, t } = useApp()
+  const toast = useToast()
+  const confirm = useConfirm()
 
   const categoriesList = state.expenseCategories.map(c => c.name)
 
@@ -50,11 +55,15 @@ export default function Income({ currentUser }: IncomeProps) {
 
   const handleSave = async () => {
     if (!form.partyId || !form.amount || !form.date) return
+    const isGu = state.language === 'gu'
 
     // Validate date falls within selected accounting year
     if (selectedYear) {
       if (form.date < selectedYear.startDate || form.date > selectedYear.endDate) {
-        alert(`${t('general.date_validation_error')} (${selectedYear.startDate} - ${selectedYear.endDate})`)
+        toast.warning(
+          t('general.date_validation_error'),
+          `${formatDisplayDate(selectedYear.startDate)} – ${formatDisplayDate(selectedYear.endDate)}`
+        )
         return
       }
     }
@@ -70,16 +79,25 @@ export default function Income({ currentUser }: IncomeProps) {
         paymentMode: form.paymentMode as Transaction['paymentMode'],
         description: form.description,
       }
-      if (editId) {
-        await updateTransaction(editId, payload)
-      } else {
-        await createTransaction(payload)
-      }
+      const saved = editId
+        ? await updateTransaction(editId, payload)
+        : await createTransaction(payload)
+
+      toast.success(
+        editId
+          ? isGu ? 'આવક અપડેટ થઈ' : 'Income updated'
+          : isGu ? 'આવક સાચવી' : 'Income recorded',
+        `${saved.voucherNo} · ${formatCurrency(saved.amount)}`
+      )
+
       setShowModal(false)
       setForm({ ...emptyForm })
       setEditId(null)
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('general.save_error'))
+      toast.error(
+        isGu ? 'આવક સાચવી શકાઈ નથી' : 'Could not save income',
+        err instanceof Error ? err.message : undefined
+      )
     } finally {
       setSaving(false)
     }
@@ -93,15 +111,24 @@ export default function Income({ currentUser }: IncomeProps) {
 
   const handleDelete = async (txn: Transaction) => {
     if (currentUser.role !== 'admin') return
-    const msg = state.language === 'gu'
-      ? `શું આ આવક (${txn.voucherNo} — ${formatCurrency(txn.amount)}) કાઢી નાખવી છે?`
-      : `Are you sure you want to delete this income (${txn.voucherNo} — ${formatCurrency(txn.amount)})?`
-    if (confirm(msg)) {
-      try {
-        await deleteTransaction(txn.id)
-      } catch (err) {
-        alert(err instanceof Error ? err.message : t('general.delete_error'))
-      }
+    const isGu = state.language === 'gu'
+    const ok = await confirm({
+      title: isGu ? 'આ આવક કાઢી નાખવી?' : 'Delete this income entry?',
+      description: `${txn.voucherNo} · ${formatCurrency(txn.amount)}`,
+      confirmText: isGu ? 'કાઢી નાખો' : 'Delete',
+      cancelText: isGu ? 'રદ કરો' : 'Cancel',
+      tone: 'danger',
+    })
+    if (!ok) return
+
+    try {
+      await deleteTransaction(txn.id)
+      toast.success(isGu ? 'આવક કાઢી નાખી' : 'Income deleted', txn.voucherNo)
+    } catch (err) {
+      toast.error(
+        isGu ? 'આવક કાઢી શકાઈ નથી' : 'Could not delete income',
+        err instanceof Error ? err.message : undefined
+      )
     }
   }
 
@@ -118,7 +145,7 @@ export default function Income({ currentUser }: IncomeProps) {
       title: t('general.date'),
       dataIndex: 'date',
       key: 'date',
-      render: (v: string) => <span style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{v}</span>,
+      render: (v: string) => <span style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{formatDisplayDate(v)}</span>,
     },
     {
       title: t('general.party'),
@@ -196,7 +223,7 @@ export default function Income({ currentUser }: IncomeProps) {
             onChange={v => setFilterCategory(v || '')}
             options={[...categoriesList.map(c => ({ value: c, label: c }))]}
           />
-          <DatePicker
+          <DatePicker format="DD-MM-YYYY"
             placeholder={state.language === 'gu' ? 'તારીખ પસંદ કરો' : 'Select Date'}
             style={{ width: 160 }}
             value={filterDate ? dayjs(filterDate) : null}
@@ -225,7 +252,7 @@ export default function Income({ currentUser }: IncomeProps) {
           dataSource={filtered}
           rowKey="id"
           size="middle"
-          pagination={{ pageSize: 15, showSizeChanger: false, showTotal: (total) => `${t('general.total')} ${total} ${t('general.records')}` }}
+          pagination={{ defaultPageSize: 15, showSizeChanger: true, pageSizeOptions: ['15', '30', '50', '100'], showTotal: (total) => `${t('general.total')} ${total} ${t('general.records')}` }}
           locale={{ emptyText: t('general.no_data') }}
           scroll={{ x: 'max-content' }}
         />
@@ -246,7 +273,7 @@ export default function Income({ currentUser }: IncomeProps) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6, color: 'var(--foreground)' }}>{t('general.date')} *</label>
-              <DatePicker
+              <DatePicker format="DD-MM-YYYY"
                 value={form.date ? dayjs(form.date) : null}
                 onChange={(date) => setForm(f => ({ ...f, date: date ? date.format('YYYY-MM-DD') : '' }))}
                 disabledDate={(current) => {

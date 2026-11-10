@@ -23,6 +23,17 @@ const HEADER_FILL: ExcelJS.FillPattern = {
   fgColor: { argb: 'FF102A83' }
 }
 
+/** Display-only timestamp in DD-MM-YYYY, hh:mm am/pm. */
+function formatExportTimestamp(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  let hours = date.getHours()
+  const suffix = hours >= 12 ? 'pm' : 'am'
+  hours = hours % 12 === 0 ? 12 : hours % 12
+  return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()}, ${pad(hours)}:${pad(date.getMinutes())} ${suffix}`
+}
+
 const HEADER_FONT: Partial<ExcelJS.Font> = {
   name: 'Calibri',
   size: 11,
@@ -142,7 +153,7 @@ export async function exportDataToExcel(password?: string, includeSensitive = Bo
   overviewSheet.addRow({ prop: 'GST Number', val: data.companySettings.gst || 'N/A' })
   overviewSheet.addRow({ prop: 'Phone Number', val: data.companySettings.phone || 'N/A' })
   overviewSheet.addRow({ prop: 'Email', val: data.companySettings.email || 'N/A' })
-  overviewSheet.addRow({ prop: 'Export Date & Time', val: new Date(data.exportedAt).toLocaleString('en-IN') })
+  overviewSheet.addRow({ prop: 'Export Date & Time', val: formatExportTimestamp(data.exportedAt) })
   overviewSheet.addRow({ prop: 'Backup Version', val: data.version })
   overviewSheet.addRow({ prop: 'Password Protected', val: password ? 'YES (Encrypted)' : 'NO' })
   overviewSheet.addRow({ prop: 'Total Registered Parties', val: data.parties.length })
@@ -637,10 +648,7 @@ export async function restoreDataFromExcel(fileBuffer: Buffer, password?: string
   const { rawData } = await parseExcelBuffer(fileBuffer, password)
   if (!rawData) throw new Error('Could not parse Excel backup data')
 
-  const nowFormatted = new Date().toLocaleString('en-IN', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  })
+  const nowFormatted = formatExportTimestamp(new Date())
 
   // Execute restore in a Prisma Transaction
   await prisma.$transaction(async (tx) => {

@@ -1,12 +1,14 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import { Alert, Avatar, Breadcrumb, Button, Layout, Space, Typography, Select, Popover, Tag, notification } from 'antd'
+import { Alert, Avatar, Breadcrumb, Button, Layout, Space, Typography, Select, Popover, Tag } from 'antd'
 import { Menu as MenuIcon, Languages, ChevronDown, User as UserIcon, LogOut } from 'lucide-react'
 import { AppProvider, useApp } from './store/AppContext'
 import type { User } from './types'
 import { api, clearToken, getToken, getTokenExp, isTokenExpired } from './lib/api'
+import { formatDisplayDate } from './lib/dateFormat'
 import Login from './components/Login'
 import Sidebar, { type Page } from './components/Sidebar'
 import LoadingScreen from './components/LoadingScreen'
+import { useToast } from './components/Toast'
 
 // Pages are split into their own chunks so the initial bundle stays small.
 // They are only downloaded when the user first visits the route.
@@ -178,6 +180,7 @@ export default function App() {
 
 function AppInner() {
   const { state, refreshData, loading, dataLoaded, resetDataLoaded, error, setSelectedYearId, changeLanguage, t } = useApp()
+  const toast = useToast()
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [activePage, setActivePageInternal] = useState<Page>(() => getPageFromLocation())
@@ -190,14 +193,9 @@ function AppInner() {
     setCurrentUser(null)
     resetDataLoaded()
     if (reason === 'expired') {
-      notification.warning({
-        message: t('auth.session_expired_title'),
-        description: t('auth.session_expired'),
-        placement: 'topRight',
-        duration: 6,
-      })
+      toast.warning(t('auth.session_expired_title'), t('auth.session_expired'), 6000)
     }
-  }, [resetDataLoaded, t])
+  }, [resetDataLoaded, t, toast])
 
   const handleNavigate = (page: Page, replace = false) => {
     setActivePageInternal(page)
@@ -367,7 +365,7 @@ function AppInner() {
   }
 
   const now = new Date()
-  const dateDisplay = now.toLocaleDateString(state.language === 'gu' ? 'gu-IN' : 'en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
+  const dateDisplay = formatDisplayDate(now)
 
   const getPageTitle = (page: Page): string => {
     if (page === 'cashbook') return t('nav.accountingYears')

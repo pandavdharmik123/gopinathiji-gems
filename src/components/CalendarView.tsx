@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, TrendingUp, Trendi
 import { useApp } from '../store/AppContext'
 import { getGujaratiTithi } from '../lib/gujaratiCalendar'
 import { formatCurrency } from '../data/mockData'
+import { formatDisplayDate } from '../lib/dateFormat'
 import type { Transaction } from '../types'
 
 export default function CalendarView() {
@@ -463,7 +464,7 @@ export default function CalendarView() {
         title={
           <div style={{ paddingRight: 24 }}>
             <Typography.Title level={4} style={{ margin: 0, color: 'var(--primary)' }}>
-              {selectedDateStr}
+              {formatDisplayDate(selectedDateStr)}
             </Typography.Title>
             {selectedGujaratiDateStr && (
               <Typography.Text style={{ fontSize: '0.85rem', color: 'var(--secondary)', fontWeight: 600 }}>

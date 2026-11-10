@@ -33,6 +33,7 @@ import { EXPENSE_CATEGORIES, formatCurrency, todayStr } from '../data/mockData'
 import { exportComprehensiveReportsPDF } from '../lib/pdfReportGenerator'
 import { getGujaratiTithi } from '../lib/gujaratiCalendar'
 import TransliteratedInput from './TransliteratedInput'
+import { formatDisplayDate } from '../lib/dateFormat'
 import type { Transaction } from '../types'
 import dayjs, { type Dayjs } from 'dayjs'
 
@@ -169,10 +170,12 @@ export default function Reports() {
   // export button referenced undefined dateFrom/dateTo identifiers and threw.
   const pdfRangeLabel = useMemo(() => {
     if (datePreset === 'custom' && customRange?.[0] && customRange?.[1]) {
-      return `${customRange[0].format('YYYY-MM-DD')} ~ ${customRange[1].format('YYYY-MM-DD')}`
+      return `${formatDisplayDate(customRange[0].toDate())} ~ ${formatDisplayDate(customRange[1].toDate())}`
     }
-    if (datePreset === 'today') return todayStr()
-    if (datePreset === 'month') return dayjs().format('YYYY-MM')
+    if (datePreset === 'today') return formatDisplayDate(todayStr())
+    if (datePreset === 'month') {
+      return `${formatDisplayDate(dayjs().startOf('month').toDate())} ~ ${formatDisplayDate(dayjs().endOf('month').toDate())}`
+    }
     return undefined
   }, [datePreset, customRange])
 
@@ -226,7 +229,7 @@ export default function Reports() {
         const tithi = getGujaratiTithi(v)
         return (
           <div>
-            <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{v}</div>
+            <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{formatDisplayDate(v)}</div>
             {tithi && <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>{tithi}</div>}
           </div>
         )
@@ -410,7 +413,7 @@ export default function Reports() {
             </h1>
             {selectedYear && (
               <Tag color="cyan" style={{ borderRadius: 12, fontWeight: 600, padding: '2px 10px' }}>
-                {selectedYear.name} ({selectedYear.startDate} ~ {selectedYear.endDate})
+                {selectedYear.name} ({formatDisplayDate(selectedYear.startDate)} ~ {formatDisplayDate(selectedYear.endDate)})
               </Tag>
             )}
           </div>
@@ -493,7 +496,7 @@ export default function Reports() {
             {/* Custom Range Picker (conditionally active) */}
             {datePreset === 'custom' && (
               <Col xs={24} sm={12} md={6}>
-                <DatePicker.RangePicker
+                <DatePicker.RangePicker format="DD-MM-YYYY"
                   style={{ width: '100%', borderRadius: 8 }}
                   value={customRange}
                   onChange={dates => setCustomRange(dates)}
@@ -717,7 +720,7 @@ export default function Reports() {
           dataSource={filteredTxns}
           rowKey="id"
           size="middle"
-          pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '25', '50', '100'], style: { margin: '16px 20px' } }}
+          pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '25', '50', '100'], style: { margin: '16px 20px' } }}
           locale={{ emptyText: t('general.no_data') }}
           scroll={{ x: 'max-content' }}
         />
@@ -746,7 +749,7 @@ export default function Reports() {
             dataSource={outstandingData}
             rowKey="id"
             size="middle"
-            pagination={{ pageSize: 10, showSizeChanger: true, style: { margin: '16px 20px' } }}
+            pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '25', '50', '100'], style: { margin: '16px 20px' } }}
             locale={{ emptyText: t('reports.all_settled') }}
             scroll={{ x: 'max-content' }}
           />

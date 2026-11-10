@@ -1,4 +1,5 @@
 import type { User, Party, Transaction, AuditLog, CompanySettings } from '../types'
+import { formatDisplayDate, formatDisplayDateTime } from '../lib/dateFormat'
 
 // ─── Seed Data ────────────────────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   phone: '+91 98765 43210',
   email: 'info@jikadara.com',
   currency: 'INR',
-  dateFormat: 'DD/MM/YYYY',
+  dateFormat: 'DD-MM-YYYY',
   language: 'en',
   lastBackup: '',
   expenseCategories: 'Travel, Visa, Ticket, Hotel, Logistic, Consulting, Other',
@@ -84,8 +85,7 @@ export function formatCurrency(amount: number): string {
 }
 
 export function formatDate(dateStr: string): string {
-  const d = new Date(dateStr)
-  return d.toLocaleDateString('gu-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  return formatDisplayDate(dateStr)
 }
 
 export function todayStr(): string {
@@ -97,7 +97,7 @@ export function todayStr(): string {
 }
 
 export function nowStr(): string {
-  return new Date().toLocaleString('en-IN', { hour12: true, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return formatDisplayDateTime(new Date())
 }
 
 export function uid(): string {

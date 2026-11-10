@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Modal, Input, Button, Typography, Alert, message } from 'antd'
+import { Modal, Input, Button, Typography, Alert } from 'antd'
 import { ShieldCheck, Lock, KeyRound, Check, RefreshCw } from 'lucide-react'
 import { api, ApiError } from '../lib/api'
 import { useApp } from '../store/AppContext'
+import { useToast } from './Toast'
 import type { User } from '../types'
 
 interface PinVerificationModalProps {
@@ -23,6 +24,7 @@ export default function PinVerificationModal({
   initialMode = 'verify'
 }: PinVerificationModalProps) {
   const { t, state } = useApp()
+  const toast = useToast()
   const isGu = state.language === 'gu'
 
   const hasPin = Boolean(currentUser.hasPin)
@@ -77,7 +79,7 @@ export default function PinVerificationModal({
     setErrorMsg(null)
     try {
       await api.auth.verifyPin(value)
-      message.success(t('pin.unlock_success'))
+      toast.success(t('pin.unlock_success'))
       onSuccess()
       onClose()
     } catch (err) {
@@ -112,7 +114,7 @@ export default function PinVerificationModal({
       if (onUserUpdate) {
         onUserUpdate({ ...currentUser, hasPin: true })
       }
-      message.success(t('pin.unlock_success'))
+      toast.success(t('pin.unlock_success'))
       onSuccess()
       onClose()
     } catch (err) {
@@ -144,7 +146,7 @@ export default function PinVerificationModal({
       if (onUserUpdate) {
         onUserUpdate({ ...currentUser, hasPin: true })
       }
-      message.success(t('pin.reset_success'))
+      toast.success(t('pin.reset_success'))
       onSuccess()
       onClose()
     } catch (err) {

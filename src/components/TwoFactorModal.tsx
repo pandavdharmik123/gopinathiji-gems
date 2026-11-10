@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Modal, Input, Button, Typography, Alert, message, Spin, Tooltip } from 'antd'
+import { Modal, Input, Button, Typography, Alert, Spin, Tooltip } from 'antd'
 import { ShieldCheck, Smartphone, Copy, Check, Lock, AlertTriangle } from 'lucide-react'
 import { api, ApiError } from '../lib/api'
 import { useApp } from '../store/AppContext'
+import { useToast } from './Toast'
 import type { User } from '../types'
 
 interface TwoFactorModalProps {
@@ -22,6 +23,7 @@ export default function TwoFactorModal({
   mode = 'setup',
 }: TwoFactorModalProps) {
   const { t, state } = useApp()
+  const toast = useToast()
   const isGu = state.language === 'gu'
 
   // Setup state
@@ -84,10 +86,10 @@ export default function TwoFactorModal({
     try {
       await navigator.clipboard.writeText(secret)
       setCopied(true)
-      message.success(t('2fa.copied'))
+      toast.success(t('2fa.copied'))
       setTimeout(() => setCopied(false), 3000)
     } catch {
-      message.info(secret)
+      toast.info(t('2fa.copy_manual') || 'Secret copied', secret)
     }
   }
 
@@ -105,7 +107,7 @@ export default function TwoFactorModal({
       if (onUserUpdate) {
         onUserUpdate(updatedUser)
       }
-      message.success(t('2fa.enable_success'))
+      toast.success(t('2fa.enable_success'))
       onSuccess()
       onClose()
     } catch (err) {
@@ -139,7 +141,7 @@ export default function TwoFactorModal({
       if (onUserUpdate) {
         onUserUpdate(updatedUser)
       }
-      message.success(t('2fa.disable_success'))
+      toast.success(t('2fa.disable_success'))
       onSuccess()
       onClose()
     } catch (err) {

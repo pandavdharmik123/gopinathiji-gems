@@ -8,6 +8,9 @@ import { exportTransactionsPDF } from '../lib/pdfReportGenerator'
 import type { Transaction, User } from '../types'
 import dayjs from 'dayjs'
 import TransliteratedInput from './TransliteratedInput'
+import { useToast } from './Toast'
+import { useConfirm } from './ConfirmDialog'
+import { formatDisplayDate } from '../lib/dateFormat'
 
 interface TransactionsProps { currentUser: User }
 
@@ -18,6 +21,8 @@ const emptyForm = {
 
 export default function Transactions({ currentUser }: TransactionsProps) {
   const { state, createTransaction, updateTransaction, deleteTransaction, t } = useApp()
+  const toast = useToast()
+  const confirm = useConfirm()
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ ...emptyForm })
   const [search, setSearch] = useState('')
@@ -68,11 +73,15 @@ export default function Transactions({ currentUser }: TransactionsProps) {
 
   const handleSave = async () => {
     if (!form.amount || !form.date) return
+    const isGu = state.language === 'gu'
 
     // Validate date falls within selected accounting year
     if (selectedYear) {
       if (form.date < selectedYear.startDate || form.date > selectedYear.endDate) {
-        alert(`${t('general.date_validation_error')} (${selectedYear.startDate} - ${selectedYear.endDate})`)
+        toast.warning(
+          t('general.date_validation_error'),
+          `${formatDisplayDate(selectedYear.startDate)} – ${formatDisplayDate(selectedYear.endDate)}`
+        )
         return
       }
     }
@@ -88,16 +97,25 @@ export default function Transactions({ currentUser }: TransactionsProps) {
         paymentMode: form.paymentMode,
         description: form.description,
       }
-      if (editId) {
-        await updateTransaction(editId, payload)
-      } else {
-        await createTransaction(payload)
-      }
+      const saved = editId
+        ? await updateTransaction(editId, payload)
+        : await createTransaction(payload)
+
+      toast.success(
+        editId
+          ? isGu ? 'વ્યવહાર અપડેટ થયો' : 'Transaction updated'
+          : isGu ? 'વ્યવહાર સાચવ્યો' : 'Transaction created',
+        `${saved.voucherNo} · ${formatCurrency(saved.amount)}`
+      )
+
       setShowModal(false)
       setForm({ ...emptyForm })
       setEditId(null)
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('general.save_error'))
+      toast.error(
+        isGu ? 'વ્યવહાર સાચવી શકાયો નથી' : 'Could not save transaction',
+        err instanceof Error ? err.message : undefined
+      )
     } finally {
       setSaving(false)
     }
@@ -111,15 +129,27 @@ export default function Transactions({ currentUser }: TransactionsProps) {
 
   const handleDelete = async (txn: Transaction) => {
     if (currentUser.role !== 'admin') return
-    const msg = state.language === 'gu'
-      ? `શું આ વ્યવહાર (${txn.voucherNo}) કાઢી નાખવો છે?`
-      : `Are you sure you want to delete transaction ${txn.voucherNo}?`
-    if (confirm(msg)) {
-      try {
-        await deleteTransaction(txn.id)
-      } catch (err) {
-        alert(err instanceof Error ? err.message : t('general.delete_error'))
-      }
+    const isGu = state.language === 'gu'
+    const ok = await confirm({
+      title: isGu ? 'વ્યવહાર કાઢી નાખવો?' : 'Delete this transaction?',
+      description: `${txn.voucherNo} · ${formatCurrency(txn.amount)}`,
+      confirmText: isGu ? 'કાઢી નાખો' : 'Delete',
+      cancelText: isGu ? 'રદ કરો' : 'Cancel',
+      tone: 'danger',
+    })
+    if (!ok) return
+
+    try {
+      await deleteTransaction(txn.id)
+      toast.success(
+        isGu ? 'વ્યવહાર કાઢી નાખ્યો' : 'Transaction deleted',
+        txn.voucherNo
+      )
+    } catch (err) {
+      toast.error(
+        isGu ? 'વ્યવહાર કાઢી શકાયો નથી' : 'Could not delete transaction',
+        err instanceof Error ? err.message : undefined
+      )
     }
   }
 
@@ -152,7 +182,7 @@ export default function Transactions({ currentUser }: TransactionsProps) {
       title: t('general.date'),
       dataIndex: 'date',
       key: 'date',
-      render: (v: string) => <span style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{v}</span>,
+      render: (v: string) => <span style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{formatDisplayDate(v)}</span>,
     },
     {
       title: state.language === 'gu' ? 'પ્રકાર' : 'Type',
@@ -258,7 +288,7 @@ export default function Transactions({ currentUser }: TransactionsProps) {
           onChange={v => setFilterMode(v || '')}
           options={PAYMENT_MODES.map(m => ({ value: m.value, label: m.label }))}
         />
-        <DatePicker
+        <DatePicker format="DD-MM-YYYY"
           placeholder={state.language === 'gu' ? 'શરૂઆત' : 'Start'}
           style={{ width: 150 }}
           value={filterDateFrom ? dayjs(filterDateFrom) : null}
@@ -270,7 +300,7 @@ export default function Transactions({ currentUser }: TransactionsProps) {
             return current && (current.isBefore(start, 'day') || current.isAfter(end, 'day'))
           }}
         />
-        <DatePicker
+        <DatePicker format="DD-MM-YYYY"
           placeholder={state.language === 'gu' ? 'અંત' : 'End'}
           style={{ width: 150 }}
           value={filterDateTo ? dayjs(filterDateTo) : null}
@@ -295,7 +325,7 @@ export default function Transactions({ currentUser }: TransactionsProps) {
           dataSource={filtered}
           rowKey="id"
           size="middle"
-          pagination={{ pageSize: 15, showSizeChanger: false, showTotal: (total) => `${t('general.total')} ${total} ${t('general.records')}` }}
+          pagination={{ defaultPageSize: 15, showSizeChanger: true, pageSizeOptions: ['15', '30', '50', '100'], showTotal: (total) => `${t('general.total')} ${total} ${t('general.records')}` }}
           locale={{ emptyText: t('general.no_data') }}
           scroll={{ x: 'max-content', y: 'calc(100vh - 280px)' }}
         />
@@ -316,8 +346,8 @@ export default function Transactions({ currentUser }: TransactionsProps) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>{t('general.date')} *</label>
-              <DatePicker 
-                value={form.date ? dayjs(form.date) : null} 
+              <DatePicker format="DD-MM-YYYY"
+                value={form.date ? dayjs(form.date) : null}
                 onChange={(date) => setForm(f => ({ ...f, date: date ? date.format('YYYY-MM-DD') : '' }))}
                 disabledDate={(current) => {
                   if (!selectedYear) return false

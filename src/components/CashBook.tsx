@@ -8,6 +8,9 @@ import { exportCashBookPDF } from '../lib/pdfReportGenerator'
 import type { User, AccountingYear } from '../types'
 import dayjs from 'dayjs'
 import TransliteratedInput from './TransliteratedInput'
+import { formatDisplayDate } from '../lib/dateFormat'
+import { useToast } from './Toast'
+import { useConfirm } from './ConfirmDialog'
 
 interface CashBookProps { currentUser: User }
 
@@ -15,6 +18,8 @@ const emptyForm = { name: '', startDate: '', endDate: '', openingBalance: '', op
 
 export default function CashBook({ currentUser }: CashBookProps) {
   const { state, createAccountingYear, updateAccountingYear, deleteAccountingYear, setSelectedYearId, t } = useApp()
+  const toast = useToast()
+  const confirm = useConfirm()
   const years = state.accountingYears
 
   const [showModal, setShowModal] = useState(false)
@@ -24,6 +29,7 @@ export default function CashBook({ currentUser }: CashBookProps) {
 
   const handleSave = async () => {
     if (!form.name || !form.startDate || !form.endDate) return
+    const isGu = state.language === 'gu'
     setSaving(true)
     try {
       const payload = {
@@ -40,11 +46,22 @@ export default function CashBook({ currentUser }: CashBookProps) {
       } else {
         await createAccountingYear(payload)
       }
+
+      toast.success(
+        editId
+          ? isGu ? 'નાણાકીય વર્ષ અપડેટ થયું' : 'Financial year updated'
+          : isGu ? 'નાણાકીય વર્ષ બન્યું' : 'Financial year created',
+        `${form.name} · ${formatDisplayDate(form.startDate)} – ${formatDisplayDate(form.endDate)}`
+      )
+
       setShowModal(false)
       setForm({ ...emptyForm })
       setEditId(null)
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('general.save_error'))
+      toast.error(
+        isGu ? 'નાણાકીય વર્ષ સાચવી શકાયું નથી' : 'Could not save financial year',
+        err instanceof Error ? err.message : undefined
+      )
     } finally {
       setSaving(false)
     }
@@ -66,23 +83,40 @@ export default function CashBook({ currentUser }: CashBookProps) {
 
   const handleDelete = async (y: AccountingYear) => {
     if (currentUser.role !== 'admin') return
-    const msg = state.language === 'gu'
-      ? `શું આ નાણાકીય વર્ષ (${y.name}) કાઢી નાખવું છે?`
-      : `Are you sure you want to delete financial year ${y.name}?`
-    if (confirm(msg)) {
-      try {
-        await deleteAccountingYear(y.id)
-      } catch (err) {
-        alert(err instanceof Error ? err.message : t('general.delete_error'))
-      }
+    const isGu = state.language === 'gu'
+    const ok = await confirm({
+      title: isGu ? 'નાણાકીય વર્ષ કાઢી નાખવું?' : 'Delete this financial year?',
+      description: `${y.name} · ${formatDisplayDate(y.startDate)} – ${formatDisplayDate(y.endDate)}`,
+      confirmText: isGu ? 'કાઢી નાખો' : 'Delete',
+      cancelText: isGu ? 'રદ કરો' : 'Cancel',
+      tone: 'danger',
+    })
+    if (!ok) return
+
+    try {
+      await deleteAccountingYear(y.id)
+      toast.success(isGu ? 'નાણાકીય વર્ષ કાઢી નાખ્યું' : 'Financial year deleted', y.name)
+    } catch (err) {
+      toast.error(
+        isGu ? 'નાણાકીય વર્ષ કાઢી શકાયું નથી' : 'Could not delete financial year',
+        err instanceof Error ? err.message : undefined
+      )
     }
   }
 
   const handleSetActive = async (y: AccountingYear) => {
+    const isGu = state.language === 'gu'
     try {
       await updateAccountingYear(y.id, { status: 'active' })
+      toast.success(
+        isGu ? 'સક્રિય નાણાકીય વર્ષ બદલાયું' : 'Active financial year changed',
+        y.name
+      )
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('general.save_error'))
+      toast.error(
+        isGu ? 'સક્રિય વર્ષ બદલી શકાયું નથી' : 'Could not change active year',
+        err instanceof Error ? err.message : undefined
+      )
     }
   }
 
@@ -99,13 +133,13 @@ export default function CashBook({ currentUser }: CashBookProps) {
       title: t('year.start'),
       dataIndex: 'startDate',
       key: 'startDate',
-      render: (v: string) => <span style={{  }}>{v}</span>,
+      render: (v: string) => <span>{formatDisplayDate(v)}</span>,
     },
     {
       title: t('year.end'),
       dataIndex: 'endDate',
       key: 'endDate',
-      render: (v: string) => <span style={{  }}>{v}</span>,
+      render: (v: string) => <span>{formatDisplayDate(v)}</span>,
     },
     {
       title: t('year.opening_cash_balance'),
@@ -227,11 +261,11 @@ export default function CashBook({ currentUser }: CashBookProps) {
               <Row gutter={24}>
                 <Col>
                   <Typography.Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.72rem', display: 'block' }}>{t('year.start')}</Typography.Text>
-                  <Typography.Text style={{ color: 'white', fontWeight: 600 }}>{selectedYear.startDate}</Typography.Text>
+                  <Typography.Text style={{ color: 'white', fontWeight: 600 }}>{formatDisplayDate(selectedYear.startDate)}</Typography.Text>
                 </Col>
                 <Col>
                   <Typography.Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.72rem', display: 'block' }}>{t('year.end')}</Typography.Text>
-                  <Typography.Text style={{ color: 'white', fontWeight: 600 }}>{selectedYear.endDate}</Typography.Text>
+                  <Typography.Text style={{ color: 'white', fontWeight: 600 }}>{formatDisplayDate(selectedYear.endDate)}</Typography.Text>
                 </Col>
                 <Col>
                   <Typography.Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.72rem', display: 'block' }}>{t('year.opening_cash_balance')}</Typography.Text>
@@ -253,7 +287,13 @@ export default function CashBook({ currentUser }: CashBookProps) {
           dataSource={years}
           rowKey="id"
           size="middle"
-          pagination={false}
+          pagination={{
+            defaultPageSize: 15,
+            showSizeChanger: true,
+            pageSizeOptions: ['15', '30', '50', '100'],
+            showTotal: (total) => `${t('general.total')} ${total} ${t('general.records')}`,
+            style: { margin: '16px 20px' }
+          }}
           locale={{ emptyText: t('general.no_data') }}
           scroll={{ x: 'max-content' }}
         />
@@ -278,16 +318,16 @@ export default function CashBook({ currentUser }: CashBookProps) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>{t('year.start')} *</label>
-              <DatePicker 
-                value={form.startDate ? dayjs(form.startDate) : null} 
+              <DatePicker format="DD-MM-YYYY"
+                value={form.startDate ? dayjs(form.startDate) : null}
                 onChange={(date) => setForm(f => ({ ...f, startDate: date ? date.format('YYYY-MM-DD') : '' }))}
                 style={{ width: '100%' }}
               />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>{t('year.end')} *</label>
-              <DatePicker 
-                value={form.endDate ? dayjs(form.endDate) : null} 
+              <DatePicker format="DD-MM-YYYY"
+                value={form.endDate ? dayjs(form.endDate) : null}
                 onChange={(date) => setForm(f => ({ ...f, endDate: date ? date.format('YYYY-MM-DD') : '' }))}
                 style={{ width: '100%' }}
               />

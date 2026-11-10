@@ -10,9 +10,7 @@ import {
   Alert,
   Space,
   Tag,
-  Popconfirm,
-  Modal,
-  message
+  Modal
 } from 'antd'
 import {
   Save,
@@ -41,6 +39,9 @@ import {
 import { useApp } from '../store/AppContext'
 import type { User } from '../types'
 import TransliteratedInput from './TransliteratedInput'
+import { useToast } from './Toast'
+import { useConfirm } from './ConfirmDialog'
+import { formatDisplayDateTime } from '../lib/dateFormat'
 
 interface SettingsProps {
   currentUser: User
@@ -58,6 +59,9 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
     deleteExpenseCategory,
     t
   } = useApp()
+
+  const toast = useToast()
+  const confirm = useConfirm()
 
   const [form, setForm] = useState({ ...state.settings })
   const [saved, setSaved] = useState(false)
@@ -92,11 +96,12 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await updateSettings(form)
+      await updateSettings({ ...form, dateFormat: 'DD-MM-YYYY' })
       setSaved(true)
+      toast.success(isGu ? 'સેટિંગ્સ સાચવી' : 'Settings saved')
       setTimeout(() => setSaved(false), 2500)
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('general.save_error'))
+      toast.error(t('general.save_error'), err instanceof Error ? err.message : undefined)
     } finally {
       setSaving(false)
     }
@@ -106,11 +111,11 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
     setExportingExcel(true)
     try {
       await exportExcelBackup(exportPassword)
-      message.success(isGu ? 'Excel ફાઇલ ડાઉનલોડ થઈ ગઈ!' : 'Excel backup downloaded successfully!')
+      toast.success(isGu ? 'Excel ફાઇલ ડાઉનલોડ થઈ ગઈ!' : 'Excel backup downloaded successfully!')
       setExportModalVisible(false)
       setExportPassword('')
     } catch (err: any) {
-      message.error(err?.message || (isGu ? 'Excel નિકાસ નિષ્ફળ ગઈ' : 'Failed to export Excel file'))
+      toast.error(err?.message || (isGu ? 'Excel નિકાસ નિષ્ફળ ગઈ' : 'Failed to export Excel file'))
     } finally {
       setExportingExcel(false)
     }
@@ -130,9 +135,9 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
     try {
       const summary = await previewExcelBackup(importFile, importPassword)
       setPreviewData(summary)
-      message.info(isGu ? 'Excel ફાઇલ ચકાસવામાં આવી!' : 'Excel file verified!')
+      toast.info(isGu ? 'Excel ફાઇલ ચકાસવામાં આવી!' : 'Excel file verified!')
     } catch (err: any) {
-      message.error(err?.message || (isGu ? 'ફાઇલ ચકાસી શકાઈ નથી' : 'Failed to verify Excel file'))
+      toast.error(err?.message || (isGu ? 'ફાઇલ ચકાસી શકાઈ નથી' : 'Failed to verify Excel file'))
     } finally {
       setPreviewing(false)
     }
@@ -143,13 +148,13 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
     setRestoringExcel(true)
     try {
       await importExcelBackup(importFile, importPassword)
-      message.success(t('settings.import_success'))
+      toast.success(t('settings.import_success'))
       setImportModalVisible(false)
       setImportFile(null)
       setImportPassword('')
       setPreviewData(null)
     } catch (err: any) {
-      message.error(err?.message || (isGu ? 'ડેટા પુનઃસ્થાપિત નિષ્ફળ' : 'Failed to restore database from Excel'))
+      toast.error(err?.message || (isGu ? 'ડેટા પુનઃસ્થાપિત નિષ્ફળ' : 'Failed to restore database from Excel'))
     } finally {
       setRestoringExcel(false)
     }
@@ -157,22 +162,35 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
 
   const handleAddCategory = async () => {
     if (!newCat.trim()) return
+    const name = newCat.trim()
     setAddingCat(true)
     try {
-      await createExpenseCategory(newCat.trim())
+      await createExpenseCategory(name)
+      toast.success(isGu ? 'ખર્ચ શ્રેણી ઉમેરાઈ' : 'Expense category added', name)
       setNewCat('')
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('general.save_error'))
+      toast.error(t('general.save_error'), err instanceof Error ? err.message : undefined)
     } finally {
       setAddingCat(false)
     }
   }
 
   const handleDeleteCategory = async (id: string) => {
+    const category = state.expenseCategories.find(c => c.id === id)
+    const ok = await confirm({
+      title: isGu ? 'ખર્ચ શ્રેણી કાઢી નાખવી?' : 'Delete this expense category?',
+      description: category?.name,
+      confirmText: isGu ? 'કાઢી નાખો' : 'Delete',
+      cancelText: isGu ? 'રદ કરો' : 'Cancel',
+      tone: 'danger',
+    })
+    if (!ok) return
+
     try {
       await deleteExpenseCategory(id)
+      toast.success(isGu ? 'ખર્ચ શ્રેણી કાઢી નાખી' : 'Expense category deleted', category?.name)
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('general.delete_error'))
+      toast.error(t('general.delete_error'), err instanceof Error ? err.message : undefined)
     }
   }
 
@@ -409,15 +427,11 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: 6, color: 'var(--foreground)' }}>
                       {t('settings.date_format')}
                     </label>
-                    <Select
+                    <Input
                       style={{ width: '100%' }}
-                      value={form.dateFormat}
-                      onChange={v => setForm(f => ({ ...f, dateFormat: v }))}
-                      options={[
-                        { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY (Standard)' },
-                        { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD (ISO)' },
-                        { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY (US)' },
-                      ]}
+                      value="DD-MM-YYYY"
+                      disabled
+                      aria-label={t('settings.date_format')}
                     />
                   </div>
                 </div>
@@ -478,7 +492,7 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
                       {t('settings.last_backup')}
                     </Typography.Text>
                     <Typography.Text type="secondary" style={{ fontSize: '0.78rem' }}>
-                      {state.settings.lastBackup || (isGu ? 'ક્યારેય નહીં' : 'Never')}
+                      {formatDisplayDateTime(state.settings.lastBackup) || (isGu ? 'ક્યારેય નહીં' : 'Never')}
                     </Typography.Text>
                   </div>
                   <Tag color="cyan" style={{ borderRadius: 8, fontWeight: 600, margin: 0 }}>
@@ -660,27 +674,21 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
                     </Typography.Text>
                   </div>
 
-                  <Popconfirm
-                    title={t('general.confirm_delete')}
-                    onConfirm={() => handleDeleteCategory(cat.id)}
-                    okText={isGu ? 'હા, કાઢી નાખો' : 'Yes, Delete'}
-                    cancelText={t('general.cancel')}
-                    okButtonProps={{ danger: true }}
-                  >
-                    <Button
-                      type="text"
-                      danger
-                      icon={<Trash2 size={14} />}
-                      style={{
-                        width: 28,
-                        height: 28,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: 6
-                      }}
-                    />
-                  </Popconfirm>
+                  <Button
+                    type="text"
+                    danger
+                    icon={<Trash2 size={14} />}
+                    aria-label={isGu ? 'શ્રેણી કાઢી નાખો' : 'Delete category'}
+                    onClick={() => handleDeleteCategory(cat.id)}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 6
+                    }}
+                  />
                 </div>
               ))}
             </div>
@@ -908,7 +916,7 @@ export default function Settings({ currentUser: _currentUser }: SettingsProps) {
               </div>
 
               <Typography.Text type="secondary" style={{ fontSize: '0.74rem' }}>
-                📅 {isGu ? 'બેકઅપ તારીખ' : 'Exported on'}: {new Date(previewData.exportedAt).toLocaleString('en-IN')}
+                📅 {isGu ? 'બેકઅપ તારીખ' : 'Exported on'}: {formatDisplayDateTime(previewData.exportedAt)}
               </Typography.Text>
             </div>
           )}

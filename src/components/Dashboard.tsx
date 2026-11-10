@@ -1,6 +1,6 @@
 import type React from 'react'
 import { useState } from 'react'
-import { Card, Col, Row, Table, Tag, Typography, Space, Alert, Button, message } from 'antd'
+import { Card, Col, Row, Table, Tag, Typography, Space, Alert, Button } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { TrendingUp, TrendingDown, DollarSign, CalendarDays, BookOpen, Clock, CheckCircle, Landmark, Coins, FileText, Lock, EyeOff, Smartphone, CreditCard } from 'lucide-react'
 import { useApp } from '../store/AppContext'
@@ -10,6 +10,8 @@ import { exportDashboardPDF } from '../lib/pdfReportGenerator'
 import type { User } from '../types'
 import type { Page } from './Sidebar'
 import PinVerificationModal from './PinVerificationModal'
+import { formatDisplayDate, formatWeekday } from '../lib/dateFormat'
+import { useToast } from './Toast'
 
 interface DashboardProps {
   currentUser: User
@@ -87,6 +89,7 @@ function StatCard({ label, value, sub, color, bgColor, iconBg, icon, trend, onCl
 
 export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps) {
   const { state, t } = useApp()
+  const toast = useToast()
   const { transactions, accountingYears, selectedYearId } = state
 
   const [isUnlocked, setIsUnlocked] = useState(false)
@@ -165,7 +168,7 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
     .slice(0, 3)
 
   const dateLocale = state.language === 'gu' ? 'gu-IN' : 'en-IN'
-  const gujaratiDate = new Date().toLocaleDateString(dateLocale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const gujaratiDate = `${formatWeekday(new Date(), dateLocale)}, ${formatDisplayDate(new Date())}`
   const gujaratiTithi = getGujaratiTithi(new Date())
 
   const renderPaymentModeTag = (mode: string) => {
@@ -238,7 +241,7 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
         const tithi = getGujaratiTithi(v)
         return (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '0.82rem' }}>{v}</span>
+            <span style={{ fontSize: '0.82rem' }}>{formatDisplayDate(v)}</span>
             {tithi && <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>{tithi}</span>}
           </div>
         )
@@ -335,7 +338,7 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
             onClick={() => {
               if (isUnlocked) {
                 setIsUnlocked(false)
-                message.info(t('pin.lock_success'))
+                toast.info(t('pin.lock_success'))
               } else {
                 setPinModalOpen(true)
               }
@@ -574,8 +577,8 @@ export default function Dashboard({ currentUser, onUserUpdate }: DashboardProps)
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {[
                   { label: t('dash.year_name'), value: selectedYear.name },
-                  { label: t('dash.start_date'), value: selectedYear.startDate },
-                  { label: t('dash.end_date'), value: selectedYear.endDate },
+                  { label: t('dash.start_date'), value: formatDisplayDate(selectedYear.startDate) },
+                  { label: t('dash.end_date'), value: formatDisplayDate(selectedYear.endDate) },
                   { label: t('year.opening_cash_balance'), value: maskAmount(selectedYear.openingBalance) },
                   { label: t('year.opening_bank_balance'), value: maskAmount(selectedYear.openingBankBalance || 0) },
                 ].map(item => (

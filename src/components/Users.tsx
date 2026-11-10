@@ -4,6 +4,8 @@ import type { ColumnsType } from 'antd/es/table'
 import { Plus, Search, Pencil } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import type { User } from '../types'
+import { formatDisplayDate } from '../lib/dateFormat'
+import { useToast } from './Toast'
 
 interface UsersProps { currentUser: User }
 
@@ -11,6 +13,7 @@ const emptyForm = { name: '', username: '', email: '', role: 'employee' as User[
 
 export default function Users({ currentUser }: UsersProps) {
   const { state, createUser, updateUser, t } = useApp()
+  const toast = useToast()
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ ...emptyForm })
   const [editId, setEditId] = useState<string | null>(null)
@@ -33,6 +36,7 @@ export default function Users({ currentUser }: UsersProps) {
 
   const handleSave = async () => {
     if (!form.name || !form.username) return
+    const isGu = state.language === 'gu'
     setSaving(true)
     try {
       if (editId) {
@@ -50,11 +54,20 @@ export default function Users({ currentUser }: UsersProps) {
           password: form.password || undefined,
         })
       }
+      toast.success(
+        editId
+          ? isGu ? 'વપરાશકર્તા અપડેટ થયો' : 'User updated'
+          : isGu ? 'વપરાશકર્તા ઉમેરાયો' : 'User created',
+        form.name
+      )
       setShowModal(false)
       setForm({ ...emptyForm })
       setEditId(null)
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('general.save_error'))
+      toast.error(
+        isGu ? 'વપરાશકર્તા સાચવી શકાયો નથી' : 'Could not save user',
+        err instanceof Error ? err.message : undefined
+      )
     } finally {
       setSaving(false)
     }
@@ -67,14 +80,27 @@ export default function Users({ currentUser }: UsersProps) {
   }
 
   const handleToggle = async (u: User) => {
-    if (u.id === currentUser.id) { 
-      alert(state.language === 'gu' ? 'તમે તમારી જાતને નિષ્ક્રિય ન કરી શકો' : 'You cannot deactivate yourself')
-      return 
+    const isGu = state.language === 'gu'
+    if (u.id === currentUser.id) {
+      toast.warning(
+        isGu ? 'તમે તમારી જાતને નિષ્ક્રિય ન કરી શકો' : 'You cannot deactivate yourself'
+      )
+      return
     }
+    const nextStatus = u.status === 'active' ? 'inactive' : 'active'
     try {
-      await updateUser(u.id, { status: u.status === 'active' ? 'inactive' : 'active' })
+      await updateUser(u.id, { status: nextStatus })
+      toast.success(
+        nextStatus === 'active'
+          ? isGu ? 'વપરાશકર્તા સક્રિય કર્યો' : 'User activated'
+          : isGu ? 'વપરાશકર્તા નિષ્ક્રિય કર્યો' : 'User deactivated',
+        u.name
+      )
     } catch (err) {
-      alert(err instanceof Error ? err.message : (state.language === 'gu' ? 'સ્થિતિ બદલી શકાઈ નથી' : 'Could not change status'))
+      toast.error(
+        isGu ? 'સ્થિતિ બદલી શકાઈ નથી' : 'Could not change status',
+        err instanceof Error ? err.message : undefined
+      )
     }
   }
 
@@ -124,7 +150,7 @@ export default function Users({ currentUser }: UsersProps) {
       title: state.language === 'gu' ? 'નોંધ તારીખ' : 'Created At',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      render: (v: string) => <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)' }}>{v}</span>,
+      render: (v: string) => <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)' }}>{formatDisplayDate(v)}</span>,
     },
     {
       title: t('general.status'),
@@ -184,7 +210,13 @@ export default function Users({ currentUser }: UsersProps) {
           dataSource={filtered}
           rowKey="id"
           size="middle"
-          pagination={false}
+          pagination={{
+            defaultPageSize: 15,
+            showSizeChanger: true,
+            pageSizeOptions: ['15', '30', '50', '100'],
+            showTotal: (total) => `${t('general.total')} ${total} ${t('general.records')}`,
+            style: { margin: '16px 20px' }
+          }}
           locale={{ emptyText: t('general.no_data') }}
           scroll={{ x: 'max-content' }}
         />
